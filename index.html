@@ -351,18 +351,9 @@ function ApiKeyScreen({ onSave }) {
       setError('API 키를 입력해주세요.');
       return;
     }
-    setError('');
-    setTesting(true);
-    try {
-      await callClaude('안녕하세요. 테스트입니다. "OK"라고만 응답해주세요.', key.trim());
-      setApiKey(key.trim());
-      showToast('API 키가 저장됐어요!', 'success');
-      onSave(key.trim());
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setTesting(false);
-    }
+    setApiKey(key.trim());
+    showToast('API 키가 저장됐어요!', 'success');
+    onSave(key.trim());
   };
 
   return (
