@@ -1077,7 +1077,7 @@ function QuizScreen({ set, go, setResults, updateStore }) {
     const correctCount = finalAnswers.filter(a => a.correct).length;
     const total = finalAnswers.length;
     const accuracy = Math.round((correctCount / total) * 100);
-    const timeSpent = Math.round((Date.now() - startTime()) / 1000);
+    const timeSpent = Math.round((Date.now() - startTime) / 1000);
     const newMistakes = [];
     finalAnswers.forEach((ans, i) => {
       if (!ans.correct) newMistakes.push({ id: 'm-' + Date.now() + '-' + i, setId: set.id, setTitle: set.title, question: set.questions[i], given: ans.given, createdAt: Date.now() });
