@@ -189,8 +189,8 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
 // ─── Constants ───────────────────────────────────────────
 const STORAGE_KEY = 'gnsai.v2';
 const API_KEY_STORAGE = 'gnsai.apikey';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001';
 
 // ─── Icons ───────────────────────────────────────────────
 const Ic = ({ name, size = 20, stroke = 1.8, style, className }) => {
@@ -253,18 +253,20 @@ async function extractPdfText(file) {
   return { text: text.trim(), pages: pdf.numPages };
 }
 
-// ─── Groq API call ───────────────────────────────────────
+// ─── Anthropic API call ──────────────────────────────────
 async function callClaude(prompt, apiKey) {
-  const res = await fetch(GROQ_URL, {
+  const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model: ANTHROPIC_MODEL,
+      max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 8192,
     }),
   });
 
@@ -280,7 +282,7 @@ async function callClaude(prompt, apiKey) {
   }
 
   const data = await res.json();
-  return data.choices[0].message.content;
+  return data.content[0].text;
 }
 
 // ─── Question generation ──────────────────────────────────
@@ -395,17 +397,18 @@ function ApiKeyScreen({ onSave }) {
               <Ic name="key" size={18} />
             </div>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-900)' }}>Groq API 키 필요</div>
-              <div style={{ fontSize: 12.5, color: 'var(--ink-500)' }}>완전 무료 · 카드 없이 사용 가능</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-900)' }}>Anthropic API 키 필요</div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-500)' }}>Claude Haiku 4.5 · 고품질 문제 생성</div>
             </div>
           </div>
           <div style={{ background: 'var(--ink-50)', borderRadius: 12, padding: '12px 14px', fontSize: 13, color: 'var(--ink-700)', lineHeight: 1.6 }}>
-            <strong>무료 API 키 발급 방법:</strong><br />
-            1. <a href="https://console.groq.com" target="_blank" style={{ color: 'var(--brand-600)' }}>console.groq.com</a> 접속<br />
+            <strong>API 키 발급 방법:</strong><br />
+            1. <a href="https://console.anthropic.com" target="_blank" style={{ color: 'var(--brand-600)' }}>console.anthropic.com</a> 접속<br />
             2. 회원가입 → 로그인<br />
-            3. 왼쪽 메뉴 "API Keys" → "Create API Key"<br />
-            4. 생성된 키(gsk_...)를 아래에 붙여넣기<br />
-            <span style={{ color: 'var(--ink-500)', fontSize: 12 }}>💡 완전 무료 · 키는 이 기기에만 저장되며 서버로 전송되지 않아요</span>
+            3. Billing에서 $5 충전<br />
+            4. API Keys → "Create Key"<br />
+            5. 생성된 키(sk-ant-...)를 아래에 붙여넣기<br />
+            <span style={{ color: 'var(--ink-500)', fontSize: 12 }}>💡 키는 이 기기에만 저장되며 서버로 전송되지 않아요</span>
           </div>
         </div>
 
@@ -416,7 +419,7 @@ function ApiKeyScreen({ onSave }) {
             <input
               className="input"
               type={show ? 'text' : 'password'}
-              placeholder="gsk_..."
+              placeholder="sk-ant-..."
               value={key}
               onChange={e => setKey(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && testAndSave()}
@@ -453,7 +456,7 @@ function ApiKeyScreen({ onSave }) {
         </button>
 
         <div style={{ textAlign: 'center', marginTop: 14, fontSize: 12, color: 'var(--ink-400)' }}>
-          Llama 3.3 70B 모델 사용 • 완전 무료
+          Claude Haiku 4.5 사용 • $5 충전 시 약 500회 사용 가능
         </div>
       </div>
     </div>
