@@ -189,7 +189,7 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
 // ─── Constants ───────────────────────────────────────────
 const STORAGE_KEY = 'gnsai.v2';
 const API_KEY_STORAGE = 'gnsai.apikey';
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-1.5-flash';
 const GEMINI_URL = () => `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${getApiKey()}`;
 
 // ─── Icons ───────────────────────────────────────────────
@@ -270,8 +270,8 @@ async function callClaude(prompt, apiKey) {
       const err = await res.json();
       errMsg = err.error?.message || errMsg;
     } catch (_) {}
-    if (res.status === 400) throw new Error('API 키가 올바르지 않아요. 다시 확인해주세요.');
-    if (res.status === 429) throw new Error('요청 한도를 초과했어요. 잠시 후 다시 시도해주세요.');
+    if (res.status === 400 || res.status === 403) throw new Error('API 키가 올바르지 않아요. 다시 확인해주세요. (' + errMsg + ')');
+    if (res.status === 429) throw new Error('요청 한도 초과 (' + errMsg + ')');
     throw new Error('API 오류 (' + res.status + '): ' + errMsg);
   }
 
