@@ -189,8 +189,8 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
 // ─── Constants ───────────────────────────────────────────
 const STORAGE_KEY = 'gnsai.v2';
 const API_KEY_STORAGE = 'gnsai.apikey';
-const GEMINI_MODEL = 'gemini-2.0-flash';
-const GEMINI_URL = () => `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${getApiKey()}`;
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // ─── Icons ───────────────────────────────────────────────
 const Ic = ({ name, size = 20, stroke = 1.8, style, className }) => {
@@ -253,14 +253,18 @@ async function extractPdfText(file) {
   return { text: text.trim(), pages: pdf.numPages };
 }
 
-// ─── Gemini API call ─────────────────────────────────────
+// ─── Groq API call ───────────────────────────────────────
 async function callClaude(prompt, apiKey) {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
+  const res = await fetch(GROQ_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 8192 },
+      model: GROQ_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 8192,
     }),
   });
 
@@ -270,13 +274,13 @@ async function callClaude(prompt, apiKey) {
       const err = await res.json();
       errMsg = err.error?.message || errMsg;
     } catch (_) {}
-    if (res.status === 400 || res.status === 403) throw new Error('API 키가 올바르지 않아요. 다시 확인해주세요. (' + errMsg + ')');
-    if (res.status === 429) throw new Error('요청 한도 초과 (' + errMsg + ')');
+    if (res.status === 401) throw new Error('API 키가 올바르지 않아요. 다시 확인해주세요.');
+    if (res.status === 429) throw new Error('요청 한도 초과. 잠시 후 다시 시도해주세요.');
     throw new Error('API 오류 (' + res.status + '): ' + errMsg);
   }
 
   const data = await res.json();
-  return data.candidates[0].content.parts[0].text;
+  return data.choices[0].message.content;
 }
 
 // ─── Question generation ──────────────────────────────────
@@ -391,16 +395,16 @@ function ApiKeyScreen({ onSave }) {
               <Ic name="key" size={18} />
             </div>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-900)' }}>Google Gemini API 키 필요</div>
-              <div style={{ fontSize: 12.5, color: 'var(--ink-500)' }}>무료로 사용 가능 · AI 문제 생성에 사용됩니다</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-900)' }}>Groq API 키 필요</div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-500)' }}>완전 무료 · 카드 없이 사용 가능</div>
             </div>
           </div>
           <div style={{ background: 'var(--ink-50)', borderRadius: 12, padding: '12px 14px', fontSize: 13, color: 'var(--ink-700)', lineHeight: 1.6 }}>
             <strong>무료 API 키 발급 방법:</strong><br />
-            1. <a href="https://aistudio.google.com/apikey" target="_blank" style={{ color: 'var(--brand-600)' }}>aistudio.google.com/apikey</a> 접속<br />
-            2. 구글 계정으로 로그인<br />
-            3. "Create API Key" 클릭<br />
-            4. 생성된 키(AIza...)를 아래에 붙여넣기<br />
+            1. <a href="https://console.groq.com" target="_blank" style={{ color: 'var(--brand-600)' }}>console.groq.com</a> 접속<br />
+            2. 회원가입 → 로그인<br />
+            3. 왼쪽 메뉴 "API Keys" → "Create API Key"<br />
+            4. 생성된 키(gsk_...)를 아래에 붙여넣기<br />
             <span style={{ color: 'var(--ink-500)', fontSize: 12 }}>💡 완전 무료 · 키는 이 기기에만 저장되며 서버로 전송되지 않아요</span>
           </div>
         </div>
@@ -412,7 +416,7 @@ function ApiKeyScreen({ onSave }) {
             <input
               className="input"
               type={show ? 'text' : 'password'}
-              placeholder="AIza..."
+              placeholder="gsk_..."
               value={key}
               onChange={e => setKey(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && testAndSave()}
@@ -449,7 +453,7 @@ function ApiKeyScreen({ onSave }) {
         </button>
 
         <div style={{ textAlign: 'center', marginTop: 14, fontSize: 12, color: 'var(--ink-400)' }}>
-          Gemini 2.0 Flash 모델 사용 • 하루 1,500회 무료
+          Llama 3.3 70B 모델 사용 • 완전 무료
         </div>
       </div>
     </div>
