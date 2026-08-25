@@ -10,6 +10,7 @@ import SummaryStrip from "@/components/SummaryStrip";
 import TaskList from "@/components/TaskList";
 import { todayISO } from "@/lib/dates";
 import { findDuplicate } from "@/lib/dedupe";
+import { buildSuggestions } from "@/lib/suggest";
 import { Sample, SampleId, buildSamples } from "@/lib/samples";
 import { ExtractResponse, Priority, Role, Status, Task } from "@/lib/types";
 
@@ -36,6 +37,13 @@ export default function Page() {
   const [tab, setTab] = useState<"today" | "inbox">("inbox");
 
   const seq = useRef(0);
+
+  /**
+   * 담당자 제안은 저장하지 않고 화면에서 매번 다시 계산한다.
+   * 한 건을 지정하는 순간 비슷한 다른 건에도 근거가 생겨야 하는데,
+   * 수집 시점에 굳혀두면 그 반영이 안 된다.
+   */
+  const suggestions = useMemo(() => buildSuggestions(tasks), [tasks]);
 
   const selectedTask = tasks.find((t) => t.id === selectedId) ?? null;
   // 선택한 카드의 근거는 그 카드가 추출된 원문이 화면에 떠 있을 때만 하이라이트한다.
@@ -246,6 +254,8 @@ export default function Page() {
             setSelectedId((cur) => (cur === id ? null : id));
           }}
           onStatusChange={(id, status) => updateTask(id, { status })}
+          suggestions={suggestions}
+          onAssigneeChange={(id, assignee) => updateTask(id, { assignee })}
         />
       ) : (
       <>
@@ -269,6 +279,7 @@ export default function Page() {
           onSelect={selectTask}
           onPriorityChange={(id, priority: Priority) => updateTask(id, { priority })}
           onAssigneeChange={(id, assignee) => updateTask(id, { assignee })}
+          suggestions={suggestions}
           onClear={() => {
             if (tasks.some((t) => t.origin === "server")) {
               void fetch("/api/tasks", { method: "DELETE" }).catch(() => undefined);

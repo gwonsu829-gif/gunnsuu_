@@ -1,9 +1,11 @@
 "use client";
 
+import AssigneeSuggestionRow from "./AssigneeSuggestion";
 import { MetaBadge, RoleBadge } from "./Badge";
 import { daysUntil, ddayLabel, formatDue, weekdayKo } from "@/lib/dates";
 import { PRIORITY_ORDER } from "@/lib/roles";
 import { UNASSIGNED } from "@/lib/team";
+import { AssigneeSuggestion } from "@/lib/suggest";
 import { Status, Task } from "@/lib/types";
 
 interface Props {
@@ -12,6 +14,8 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onStatusChange: (id: string, status: Status) => void;
+  suggestions: Map<string, AssigneeSuggestion>;
+  onAssigneeChange: (id: string, assignee: string) => void;
 }
 
 /**
@@ -34,6 +38,8 @@ export default function PlannerView({
   selectedId,
   onSelect,
   onStatusChange,
+  suggestions,
+  onAssigneeChange,
 }: Props) {
   /**
    * 완료한 항목을 목록에서 빼지 않고 제자리에 취소선으로 남긴다.
@@ -100,6 +106,8 @@ export default function PlannerView({
                       selected={task.id === selectedId}
                       onSelect={onSelect}
                       onStatusChange={onStatusChange}
+                      suggestion={suggestions.get(task.id)}
+                      onAssigneeChange={onAssigneeChange}
                     />
                   ))}
                 </ul>
@@ -119,12 +127,16 @@ function Row({
   selected,
   onSelect,
   onStatusChange,
+  suggestion,
+  onAssigneeChange,
 }: {
   task: Task;
   today: string;
   selected: boolean;
   onSelect: (id: string) => void;
   onStatusChange: (id: string, status: Status) => void;
+  suggestion?: AssigneeSuggestion;
+  onAssigneeChange: (id: string, assignee: string) => void;
 }) {
   const days = daysUntil(task.dueDate, today);
   const done = task.status === "완료";
@@ -158,6 +170,12 @@ function Row({
           <RoleBadge role={task.role} />
           {task.assignee !== UNASSIGNED ? (
             <MetaBadge>{task.assignee}</MetaBadge>
+          ) : suggestion ? (
+            <AssigneeSuggestionRow
+              compact
+              suggestion={suggestion}
+              onAccept={(name) => onAssigneeChange(task.id, name)}
+            />
           ) : (
             <MetaBadge tone="warn">담당 미지정</MetaBadge>
           )}

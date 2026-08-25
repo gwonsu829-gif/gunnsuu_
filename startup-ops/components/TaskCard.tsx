@@ -1,10 +1,12 @@
 "use client";
 
+import AssigneeSuggestionRow from "./AssigneeSuggestion";
 import BadgeSelect from "./BadgeSelect";
 import { MetaBadge, RoleBadge } from "./Badge";
 import { formatDue, isDueToday, isOverdue } from "@/lib/dates";
 import { PRIORITY_STYLE } from "@/lib/roles";
 import { UNASSIGNED, assigneeOptions, teamRoleOf } from "@/lib/team";
+import { AssigneeSuggestion } from "@/lib/suggest";
 import { PRIORITIES, Priority, Task } from "@/lib/types";
 
 interface Props {
@@ -14,6 +16,7 @@ interface Props {
   onSelect: (id: string) => void;
   onPriorityChange: (id: string, priority: Priority) => void;
   onAssigneeChange: (id: string, assignee: string) => void;
+  suggestion?: AssigneeSuggestion;
 }
 
 export default function TaskCard({
@@ -23,6 +26,7 @@ export default function TaskCard({
   onSelect,
   onPriorityChange,
   onAssigneeChange,
+  suggestion,
 }: Props) {
   const overdue = isOverdue(task.dueDate, today);
   const dueToday = isDueToday(task.dueDate, today);
@@ -87,6 +91,13 @@ export default function TaskCard({
           title={teamRole ? `담당자 변경 (${task.assignee} · ${teamRole})` : "담당자 지정"}
         />
       </div>
+
+      {suggestion && (
+        <AssigneeSuggestionRow
+          suggestion={suggestion}
+          onAccept={(name) => onAssigneeChange(task.id, name)}
+        />
+      )}
 
       {task.source && (
         <p className="mt-2 flex flex-wrap items-baseline gap-1 border-t border-dashed border-slate-200 pt-2 text-[11px] leading-relaxed text-slate-500">

@@ -2,6 +2,7 @@
 
 import TaskCard from "./TaskCard";
 import { PRIORITY_ORDER } from "@/lib/roles";
+import { AssigneeSuggestion } from "@/lib/suggest";
 import { Priority, Task } from "@/lib/types";
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
   onPriorityChange: (id: string, priority: Priority) => void;
   onAssigneeChange: (id: string, assignee: string) => void;
   onClear: () => void;
+  suggestions: Map<string, AssigneeSuggestion>;
 }
 
 export default function TaskList({
@@ -22,6 +24,7 @@ export default function TaskList({
   onPriorityChange,
   onAssigneeChange,
   onClear,
+  suggestions,
 }: Props) {
   const sorted = [...tasks].sort((a, b) => {
     const p = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
@@ -71,6 +74,7 @@ export default function TaskList({
               onSelect={onSelect}
               onPriorityChange={onPriorityChange}
               onAssigneeChange={onAssigneeChange}
+              suggestion={suggestions.get(task.id)}
             />
           ))
         )}
