@@ -160,10 +160,19 @@ Upstash Redis를 붙이면 된다 (Vercel 마켓플레이스에 연동이 있다
 Gmail OAuth 대신 **수신 웹훅** 방식이다. 인증 절차가 없다.
 
 1. `INGEST_SECRET`에 아무 긴 문자열을 넣는다 (이게 없으면 수집 엔드포인트는 꺼진 채로 있다)
-2. 메일 전달 서비스(Cloudflare Email Routing, SendGrid Inbound Parse, Postmark 등)에서
-   `POST https://<도메인>/api/ingest/email` 로 보내도록 설정하고,
+2. `POST https://<도메인>/api/ingest/email` 로 메일을 보내도록 설정하고,
    헤더 `x-ingest-secret: <INGEST_SECRET>`을 붙인다
-3. Gmail 필터로 원하는 메일만 그 주소로 자동 전달
+
+보내는 쪽은 두 가지 방법이 있다.
+
+**Gmail Apps Script (권장).** 도메인도 외부 서비스 가입도 필요 없다.
+`docs/gmail-forwarder.gs`를 script.google.com에 붙여넣고 상단 세 값을 채운 뒤
+시간 기반 트리거를 걸면 된다. Gmail에 `할일수집` 라벨을 만들고, 필터로 원하는
+메일에 그 라벨이 붙게 하면 그 메일만 수집된다. 보낸 메일은 라벨을 떼므로
+같은 메일을 다시 보내지 않고, 전송에 실패하면 라벨이 남아 다음 실행에서 재시도한다.
+
+**메일 전달 서비스.** Cloudflare Email Routing, SendGrid Inbound Parse, Postmark 등.
+도메인이 있으면 이쪽이 실시간에 가깝다. 서비스마다 필드 이름이 달라도 흡수한다.
 
 JSON·form-urlencoded·multipart 세 형식을 모두 받고, 서비스마다 다른 필드 이름
 (`subject`/`Subject`, `text`/`TextBody`/`body` 등)을 흡수한다.
