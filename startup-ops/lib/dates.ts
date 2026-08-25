@@ -62,3 +62,22 @@ export function nextWeekMonday(iso: string): string {
   const backToMonday = cur === 0 ? -6 : 1 - cur;
   return addDays(iso, backToMonday + 7);
 }
+
+/**
+ * 오늘로부터 며칠 남았는지. 음수면 지났고, 마감 미정이면 null.
+ * 앰플랩은 마감을 "D-5" 같은 상대 표기로 관리하므로 화면도 그 단위를 쓴다.
+ */
+export function daysUntil(iso: string, today = todayISO()): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const p = (s: string) => {
+    const [y, m, d] = s.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((p(iso) - p(today)) / 86_400_000);
+}
+
+/** "D-Day" / "D-3" / "D+2" (지남) */
+export function ddayLabel(days: number): string {
+  if (days === 0) return "D-Day";
+  return days > 0 ? `D-${days}` : `D+${-days}`;
+}

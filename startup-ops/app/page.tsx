@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import IntegrationStatus, { Integrations } from "@/components/IntegrationStatus";
 import KanbanBoard from "@/components/KanbanBoard";
+import PlannerView from "@/components/PlannerView";
 import SourcePanel from "@/components/SourcePanel";
 import SummaryStrip from "@/components/SummaryStrip";
 import TaskList from "@/components/TaskList";
@@ -27,6 +28,12 @@ export default function Page() {
   const [demoReason, setDemoReason] = useState<string | null>(null);
   const [integrations, setIntegrations] = useState<Integrations | null>(null);
   const [syncing, setSyncing] = useState(false);
+  /**
+   * 두 화면이 서로 다른 질문에 답한다.
+   * 오늘 — 마감이 가까운 순. "뭐부터 하나"
+   * 인입 — 직무별로 쌓인 것. "새로 뭐가 들어왔고 분류가 맞나"
+   */
+  const [tab, setTab] = useState<"today" | "inbox">("inbox");
 
   const seq = useRef(0);
 
@@ -203,6 +210,45 @@ export default function Page() {
         onRefresh={() => void loadServerTasks()}
       />
 
+      <nav className="flex items-center gap-1 border-b border-slate-200">
+        {([
+          ["today", "오늘", tasks.filter((t) => t.status !== "완료").length],
+          ["inbox", "인입", tasks.length],
+        ] as const).map(([key, label, count]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            aria-current={tab === key}
+            className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium transition
+              ${
+                tab === key
+                  ? "border-slate-900 text-slate-900"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+          >
+            {label}
+            {count > 0 && (
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">
+                {count}
+              </span>
+            )}
+          </button>
+        ))}
+      </nav>
+
+      {tab === "today" ? (
+        <PlannerView
+          tasks={tasks}
+          today={today}
+          selectedId={selectedId}
+          onSelect={(id) => {
+            setSelectedId((cur) => (cur === id ? null : id));
+          }}
+          onStatusChange={(id, status) => updateTask(id, { status })}
+        />
+      ) : (
+      <>
       <div className="grid gap-3 lg:min-h-[560px] lg:grid-cols-2">
         <SourcePanel
           value={text}
@@ -251,6 +297,8 @@ export default function Page() {
           onMove={moveTask}
         />
       </section>
+      </>
+      )}
     </main>
   );
 }
