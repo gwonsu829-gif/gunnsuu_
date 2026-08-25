@@ -51,7 +51,7 @@ export default function TaskList({
         )}
       </header>
 
-      <div className="thin-scroll min-h-0 flex-1 space-y-2 overflow-auto p-3">
+      <div className="thin-scroll min-h-[300px] flex-1 space-y-2 overflow-auto p-3">
         {tasks.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-1 py-10 text-center">
             <p className="text-[13px] font-medium text-slate-500">

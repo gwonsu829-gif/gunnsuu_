@@ -144,7 +144,7 @@ export default function Page() {
 
       <SummaryStrip tasks={tasks} today={today} />
 
-      <div className="grid min-h-[440px] gap-3 lg:grid-cols-2">
+      <div className="grid gap-3 lg:min-h-[560px] lg:grid-cols-2">
         <SourcePanel
           value={text}
           onChange={handleTextChange}

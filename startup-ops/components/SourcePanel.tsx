@@ -63,7 +63,7 @@ export default function SourcePanel({
         </div>
       </header>
 
-      <div className="relative min-h-0 flex-1">
+      <div className="relative min-h-[320px] flex-1">
         {segments ? (
           <div
             role="button"
