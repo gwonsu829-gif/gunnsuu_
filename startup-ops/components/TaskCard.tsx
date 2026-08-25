@@ -1,26 +1,38 @@
 "use client";
 
-import { MetaBadge, PriorityBadge, RoleBadge } from "./Badge";
+import BadgeSelect from "./BadgeSelect";
+import { MetaBadge, RoleBadge } from "./Badge";
 import { formatDue, isDueToday, isOverdue } from "@/lib/dates";
-import { Task } from "@/lib/types";
+import { PRIORITY_STYLE } from "@/lib/roles";
+import { UNASSIGNED, assigneeOptions, teamRoleOf } from "@/lib/team";
+import { PRIORITIES, Priority, Task } from "@/lib/types";
 
 interface Props {
   task: Task;
   selected: boolean;
   today: string;
   onSelect: (id: string) => void;
+  onPriorityChange: (id: string, priority: Priority) => void;
+  onAssigneeChange: (id: string, assignee: string) => void;
 }
 
-export default function TaskCard({ task, selected, today, onSelect }: Props) {
+export default function TaskCard({
+  task,
+  selected,
+  today,
+  onSelect,
+  onPriorityChange,
+  onAssigneeChange,
+}: Props) {
   const overdue = isOverdue(task.dueDate, today);
   const dueToday = isDueToday(task.dueDate, today);
+  const unassigned = task.assignee === UNASSIGNED;
+  const teamRole = teamRoleOf(task.assignee);
 
   return (
-    <button
-      type="button"
+    <div
       onClick={() => onSelect(task.id)}
-      aria-pressed={selected}
-      className={`w-full rounded-md border bg-white p-3 text-left shadow-card transition
+      className={`rounded-md border bg-white p-3 shadow-card transition
         ${
           selected
             ? "border-slate-900 ring-1 ring-slate-900"
@@ -28,9 +40,17 @@ export default function TaskCard({ task, selected, today, onSelect }: Props) {
         }`}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[13px] font-semibold leading-snug text-slate-900">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(task.id);
+          }}
+          aria-pressed={selected}
+          className="flex-1 text-left text-[13px] font-semibold leading-snug text-slate-900"
+        >
           {task.title}
-        </p>
+        </button>
         {task.duplicateOf && (
           <span className="shrink-0 rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium leading-none text-slate-600">
             중복 의심
@@ -40,13 +60,32 @@ export default function TaskCard({ task, selected, today, onSelect }: Props) {
 
       <div className="mt-2 flex flex-wrap items-center gap-1">
         <RoleBadge role={task.role} />
-        <PriorityBadge priority={task.priority} />
+
+        <BadgeSelect
+          value={task.priority}
+          options={[...PRIORITIES]}
+          onChange={(v) => onPriorityChange(task.id, v as Priority)}
+          className={PRIORITY_STYLE[task.priority]}
+          title="우선순위 변경"
+        />
+
         <MetaBadge tone={overdue ? "danger" : dueToday ? "warn" : "default"}>
           {task.dueDate === "미정"
             ? "마감 미정"
             : `${formatDue(task.dueDate)}${overdue ? " 지남" : dueToday ? " 오늘" : ""}`}
         </MetaBadge>
-        <MetaBadge>{task.assignee}</MetaBadge>
+
+        <BadgeSelect
+          value={task.assignee}
+          options={assigneeOptions(task.assignee)}
+          onChange={(v) => onAssigneeChange(task.id, v)}
+          className={
+            unassigned
+              ? "border-orange-200 bg-orange-50 text-orange-700"
+              : "border-slate-200 bg-white text-slate-600"
+          }
+          title={teamRole ? `담당자 변경 (${task.assignee} · ${teamRole})` : "담당자 지정"}
+        />
       </div>
 
       {task.source && (
@@ -55,7 +94,7 @@ export default function TaskCard({ task, selected, today, onSelect }: Props) {
           {task.sourceLabel} — “{truncate(task.source, 70)}”
         </p>
       )}
-    </button>
+    </div>
   );
 }
 

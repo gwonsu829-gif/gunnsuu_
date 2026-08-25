@@ -9,7 +9,7 @@ import TaskList from "@/components/TaskList";
 import { todayISO } from "@/lib/dates";
 import { findDuplicate } from "@/lib/dedupe";
 import { Sample, SampleId, buildSamples } from "@/lib/samples";
-import { ExtractResponse, Role, Status, Task } from "@/lib/types";
+import { ExtractResponse, Priority, Role, Status, Task } from "@/lib/types";
 
 export default function Page() {
   // 서버·클라이언트가 같은 날짜를 쓰도록 렌더 중 한 번만 계산한다.
@@ -96,9 +96,12 @@ export default function Page() {
   }
 
   function moveTask(id: string, role: Role, status: Status) {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, role, status } : t)),
-    );
+    updateTask(id, { role, status });
+  }
+
+  /** AI가 정한 값을 사람이 덮어쓰는 유일한 경로. */
+  function updateTask(id: string, patch: Partial<Task>) {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }
 
   function selectTask(id: string) {
@@ -159,6 +162,8 @@ export default function Page() {
           selectedId={selectedId}
           today={today}
           onSelect={selectTask}
+          onPriorityChange={(id, priority: Priority) => updateTask(id, { priority })}
+          onAssigneeChange={(id, assignee) => updateTask(id, { assignee })}
           onClear={() => {
             setTasks([]);
             setSelectedId(null);

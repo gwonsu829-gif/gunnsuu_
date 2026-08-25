@@ -1,6 +1,7 @@
 "use client";
 
 import { isDueToday, isOverdue } from "@/lib/dates";
+import { UNASSIGNED } from "@/lib/team";
 import { Task } from "@/lib/types";
 
 export default function SummaryStrip({
@@ -28,6 +29,11 @@ export default function SummaryStrip({
       tone: "text-red-600",
     },
     {
+      label: "담당자 미지정",
+      value: tasks.filter((t) => t.assignee === UNASSIGNED).length,
+      tone: "text-orange-600",
+    },
+    {
       label: "완료",
       value: tasks.filter((t) => t.status === "완료").length,
       tone: "text-emerald-600",
@@ -35,7 +41,7 @@ export default function SummaryStrip({
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-slate-200 bg-slate-200 sm:grid-cols-5">
+    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-slate-200 bg-slate-200 sm:grid-cols-3 lg:grid-cols-6">
       {stats.map((s) => (
         <div key={s.label} className="bg-white px-3 py-2">
           <p className="text-[11px] text-slate-500">{s.label}</p>

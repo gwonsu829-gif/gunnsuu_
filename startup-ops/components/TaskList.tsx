@@ -2,13 +2,15 @@
 
 import TaskCard from "./TaskCard";
 import { PRIORITY_ORDER } from "@/lib/roles";
-import { Task } from "@/lib/types";
+import { Priority, Task } from "@/lib/types";
 
 interface Props {
   tasks: Task[];
   selectedId: string | null;
   today: string;
   onSelect: (id: string) => void;
+  onPriorityChange: (id: string, priority: Priority) => void;
+  onAssigneeChange: (id: string, assignee: string) => void;
   onClear: () => void;
 }
 
@@ -17,6 +19,8 @@ export default function TaskList({
   selectedId,
   today,
   onSelect,
+  onPriorityChange,
+  onAssigneeChange,
   onClear,
 }: Props) {
   const sorted = [...tasks].sort((a, b) => {
@@ -65,6 +69,8 @@ export default function TaskList({
               today={today}
               selected={task.id === selectedId}
               onSelect={onSelect}
+              onPriorityChange={onPriorityChange}
+              onAssigneeChange={onAssigneeChange}
             />
           ))
         )}
