@@ -7,6 +7,7 @@ import KanbanBoard from "@/components/KanbanBoard";
 import SourcePanel from "@/components/SourcePanel";
 import SummaryStrip from "@/components/SummaryStrip";
 import TaskList from "@/components/TaskList";
+import { EMPTY_USAGE, Usage, addUsage, formatKrw } from "@/lib/cost";
 import { todayISO } from "@/lib/dates";
 import { findDuplicate } from "@/lib/dedupe";
 import { Sample, SampleId, buildSamples } from "@/lib/samples";
@@ -26,6 +27,10 @@ export default function Page() {
   const [demo, setDemo] = useState(false);
   const [demoReason, setDemoReason] = useState<string | null>(null);
   const [integrations, setIntegrations] = useState<Integrations | null>(null);
+  // 기획서에 "건당 얼마"를 추정이 아니라 실측으로 쓰기 위해 누적해 둔다.
+  const [usageTotal, setUsageTotal] = useState<Usage>(EMPTY_USAGE);
+  const [usageCount, setUsageCount] = useState(0);
+  const [lastUsage, setLastUsage] = useState<Usage | null>(null);
   const [syncing, setSyncing] = useState(false);
 
   const seq = useRef(0);
@@ -101,6 +106,12 @@ export default function Page() {
 
       setDemo(data.demo);
       setDemoReason(data.demoReason ?? null);
+
+      if (data.usage) {
+        setLastUsage(data.usage);
+        setUsageTotal((prev) => addUsage(prev, data.usage!));
+        setUsageCount((n) => n + 1);
+      }
 
       if (data.tasks.length === 0) {
         setError("이 원문에서는 할일을 찾지 못했습니다.");
@@ -196,6 +207,38 @@ export default function Page() {
       </header>
 
       <SummaryStrip tasks={tasks} today={today} />
+
+      {usageCount > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-600">
+          <span className="font-semibold text-slate-700">AI 사용량</span>
+          {lastUsage && (
+            <span>
+              이번 추출 · 입력 {lastUsage.inputTokens.toLocaleString()} / 출력{" "}
+              {lastUsage.outputTokens.toLocaleString()} 토큰 ·{" "}
+              <span className="font-medium text-slate-800">{formatKrw(lastUsage)}</span>
+            </span>
+          )}
+          <span className="text-slate-400">|</span>
+          <span>
+            누적 {usageCount}건 ·{" "}
+            <span className="font-medium text-slate-800">{formatKrw(usageTotal)}</span>
+            {usageCount > 1 && (
+              <>
+                {" "}· 건당 평균{" "}
+                <span className="font-medium text-slate-800">
+                  {formatKrw({
+                    inputTokens: Math.round(usageTotal.inputTokens / usageCount),
+                    outputTokens: Math.round(usageTotal.outputTokens / usageCount),
+                  })}
+                </span>
+              </>
+            )}
+          </span>
+          <span className="text-slate-400">
+            claude-sonnet-5 정가 기준 · 환율 대략치
+          </span>
+        </div>
+      )}
 
       <IntegrationStatus
         integrations={integrations}

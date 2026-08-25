@@ -53,6 +53,8 @@ export interface Task extends ExtractedTask {
 
 export interface ExtractResponse {
   tasks: ExtractedTask[];
+  /** 실제 모델 호출이 있었을 때만. 데모 폴백이면 없다. */
+  usage?: { inputTokens: number; outputTokens: number };
   /** 데모 프리셋으로 응답했는지 여부 */
   demo: boolean;
   /** 데모로 폴백한 이유 (있으면 화면 툴팁에 노출) */
