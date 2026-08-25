@@ -7,6 +7,14 @@ export interface DiscordMessage {
   author: { username: string; global_name?: string | null; bot?: boolean };
 }
 
+/** 채널이든 그 아래 스레드든, 수집 대상은 같은 모양으로 다룬다. */
+export interface CollectSource {
+  id: string;
+  label: string;
+  /** 스레드면 부모 채널 id */
+  parentId?: string;
+}
+
 export interface ChannelConfig {
   id: string;
   /** 화면에 보여줄 이름. 설정에 없으면 채널 ID를 그대로 쓴다. */
@@ -101,4 +109,100 @@ function formatKstTime(iso: string): string {
   const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
 
   return `${Number(get("month"))}/${Number(get("day"))} ${meridiem} ${hour12}:${get("minute")}`;
+}
+
+/* ---------- 스레드 ---------- */
+
+interface ThreadChannel {
+  id: string;
+  name: string;
+  parent_id?: string | null;
+  thread_metadata?: { archived?: boolean; archive_timestamp?: string };
+}
+
+async function discordGet<T>(token: string, path: string): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    headers: { Authorization: `Bot ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(
+      `디스코드 API ${res.status}${detail ? ` — ${detail.slice(0, 200)}` : ""}`,
+    );
+  }
+  return (await res.json()) as T;
+}
+
+/**
+ * 서버 id를 설정으로 받지 않고 채널 하나를 조회해 알아낸다.
+ * 사용자가 채널 id만 넣으면 되도록 하려는 것.
+ */
+export async function fetchGuildId(
+  token: string,
+  channelId: string,
+): Promise<string> {
+  const ch = await discordGet<{ guild_id?: string }>(token, `/channels/${channelId}`);
+  if (!ch.guild_id) throw new Error("채널에서 서버 id를 찾지 못했습니다.");
+  return ch.guild_id;
+}
+
+/** 보관된 지 이만큼 지난 스레드는 지나간 대화로 보고 건드리지 않는다. */
+const ARCHIVED_WINDOW_DAYS = 7;
+
+/**
+ * 설정한 채널들에 달린 스레드를 찾는다.
+ *
+ * 앰플랩 서버는 채널이 프로젝트 단위라 실제 업무 대화가 그 아래 스레드에서
+ * 오간다. 채널 본문만 긁으면 그 대화가 통째로 누락된다.
+ *
+ * 활성 스레드 전부 + 최근 보관된 스레드까지 본다. 오래 전에 보관된 것까지
+ * 훑으면 첫 실행에서 지나간 대화가 한꺼번에 할일로 올라온다.
+ */
+export async function fetchThreads(
+  token: string,
+  channels: ChannelConfig[],
+): Promise<CollectSource[]> {
+  if (!channels.length) return [];
+
+  const wanted = new Map(channels.map((c) => [c.id, c.label]));
+  const found = new Map<string, CollectSource>();
+
+  const add = (t: ThreadChannel) => {
+    const parent = t.parent_id ? wanted.get(t.parent_id) : undefined;
+    if (!parent || found.has(t.id)) return;
+    found.set(t.id, {
+      id: t.id,
+      label: `${parent} › ${t.name}`,
+      parentId: t.parent_id ?? undefined,
+    });
+  };
+
+  // 활성 스레드는 서버 단위로 한 번에 받아온다.
+  const guildId = await fetchGuildId(token, channels[0].id);
+  const active = await discordGet<{ threads: ThreadChannel[] }>(
+    token,
+    `/guilds/${guildId}/threads/active`,
+  );
+  active.threads.forEach(add);
+
+  // 최근 보관된 스레드는 채널별로 확인한다.
+  const cutoff = Date.now() - ARCHIVED_WINDOW_DAYS * 86_400_000;
+  for (const channel of channels) {
+    try {
+      const archived = await discordGet<{ threads: ThreadChannel[] }>(
+        token,
+        `/channels/${channel.id}/threads/archived/public?limit=10`,
+      );
+      for (const t of archived.threads) {
+        const ts = t.thread_metadata?.archive_timestamp;
+        if (ts && Date.parse(ts) < cutoff) continue;
+        add(t);
+      }
+    } catch {
+      // 스레드를 못 읽어도 채널 본문 수집은 계속되어야 한다.
+    }
+  }
+
+  return Array.from(found.values());
 }

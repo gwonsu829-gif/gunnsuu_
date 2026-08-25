@@ -1,5 +1,7 @@
 import {
+  CollectSource,
   fetchMessages,
+  fetchThreads,
   isUsable,
   readBotToken,
   readChannelConfig,
@@ -13,6 +15,7 @@ const MIN_MESSAGES = 2;
 
 export interface ChannelReport {
   채널: string;
+  스레드?: boolean;
   새_메시지: number;
   추가된_할일?: number;
   중복_의심?: number;
@@ -34,7 +37,23 @@ export async function collectDiscord(): Promise<CollectOutcome> {
   const store = getStore();
   const reports: ChannelReport[] = [];
 
-  for (const channel of channels) {
+  /**
+   * 채널 본문과 그 아래 스레드를 같은 방식으로 훑는다.
+   * 프로젝트 단위 채널에서는 실제 업무 대화가 스레드에서 오가므로,
+   * 채널만 보면 그 대화가 통째로 누락된다.
+   */
+  const sources: CollectSource[] = channels.map((c) => ({ id: c.id, label: c.label }));
+  try {
+    sources.push(...(await fetchThreads(token, channels)));
+  } catch (error) {
+    reports.push({
+      채널: "(스레드 조회)",
+      새_메시지: 0,
+      오류: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  for (const channel of sources) {
     const cursorKey = `discord:${channel.id}`;
     try {
       const after = await store.getCursor(cursorKey);
@@ -71,6 +90,7 @@ export async function collectDiscord(): Promise<CollectOutcome> {
 
       reports.push({
         채널: channel.label,
+        스레드: Boolean(channel.parentId),
         새_메시지: messages.length,
         추가된_할일: result.added,
         중복_의심: result.duplicates,
