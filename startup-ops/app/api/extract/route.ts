@@ -38,6 +38,5 @@ export async function POST(request: Request) {
     tasks: outcome.tasks,
     demo: outcome.demo,
     demoReason: outcome.demoReason,
-    usage: outcome.usage,
   } satisfies ExtractResponse);
 }
