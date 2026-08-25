@@ -45,6 +45,44 @@ export default function IntegrationStatus({
 
   const 저장소켜짐 = integrations.저장소 === "redis";
 
+  /** 크론을 기다리지 않고 지금 디스코드를 훑는다. */
+  async function collectDiscord() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/ingest/discord/run", { method: "POST" });
+      const data = (await res.json()) as {
+        error?: string;
+        채널별?: {
+          채널: string;
+          새_메시지: number;
+          추가된_할일?: number;
+          건너뜀?: string;
+          오류?: string;
+        }[];
+      };
+      if (!res.ok || !data.채널별) {
+        setTestResult(data.error ?? "수집 실패");
+        return;
+      }
+      setTestResult(
+        data.채널별
+          .map((c) => {
+            if (c.오류) return `${c.채널}: ${c.오류}`;
+            if (c.건너뜀) return `${c.채널}: ${c.건너뜀}`;
+            if (!c.새_메시지) return `${c.채널}: 새 메시지 없음`;
+            return `${c.채널}: 메시지 ${c.새_메시지}건 → 할일 ${c.추가된_할일 ?? 0}건`;
+          })
+          .join(" / "),
+      );
+      onRefresh();
+    } catch {
+      setTestResult("수집 요청을 보내지 못했습니다.");
+    } finally {
+      setTesting(false);
+    }
+  }
+
   /** 메일 전달 서비스를 붙이기 전에 수집 경로 전체가 이어지는지 확인한다. */
   async function runTest() {
     setTesting(true);
@@ -113,12 +151,23 @@ export default function IntegrationStatus({
       )}
 
       {testResult && (
-        <span className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
+        <span className="max-w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
           {testResult}
         </span>
       )}
 
       <div className="ml-auto flex items-center gap-1.5">
+        {integrations.디스코드 && (
+          <button
+            type="button"
+            onClick={() => void collectDiscord()}
+            disabled={testing}
+            title="크론을 기다리지 않고 지금 채널을 훑습니다"
+            className="rounded border border-slate-300 px-2 py-1 text-[11px] text-slate-600 hover:border-slate-500 hover:text-slate-900 disabled:opacity-50"
+          >
+            {testing ? "수집 중" : "디스코드 지금 수집"}
+          </button>
+        )}
         {integrations.메일 && (
           <button
             type="button"
