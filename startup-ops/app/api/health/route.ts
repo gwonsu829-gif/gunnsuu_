@@ -1,6 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 
+import { readBotToken, readChannelConfig } from "@/lib/discord";
+import { getStore } from "@/lib/store";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -16,14 +19,49 @@ export async function GET(request: Request) {
   const raw = process.env.ANTHROPIC_API_KEY ?? "";
   const key = raw.trim().replace(/^["']|["']$/g, "");
 
+  const botToken = readBotToken();
+  const channels = readChannelConfig();
+  const ingestSecret = (process.env.INGEST_SECRET ?? "").trim();
+
   const report: Record<string, unknown> = {
-    키가_서버에_전달됨: raw.length > 0,
-    키_길이: raw.length,
-    앞뒤_공백_있음: raw !== raw.trim(),
-    따옴표로_감싸짐: /^["'].*["']$/.test(raw.trim()),
-    형식이_맞아보임: key.startsWith("sk-ant-"),
     배포환경: process.env.VERCEL_ENV ?? "local",
-    모델: "claude-sonnet-5",
+
+    AI: {
+      키가_서버에_전달됨: raw.length > 0,
+      키_길이: raw.length,
+      앞뒤_공백_있음: raw !== raw.trim(),
+      따옴표로_감싸짐: /^["'].*["']$/.test(raw.trim()),
+      형식이_맞아보임: key.startsWith("sk-ant-"),
+      모델: "claude-sonnet-5",
+    },
+
+    저장소: {
+      종류: getStore().kind,
+      // 어느 이름으로 들어왔는지까지 보여야 설정 실수를 짚을 수 있다.
+      UPSTASH_REDIS_REST_URL: Boolean(process.env.UPSTASH_REDIS_REST_URL),
+      KV_REST_API_URL: Boolean(process.env.KV_REST_API_URL),
+      UPSTASH_REDIS_REST_TOKEN: Boolean(process.env.UPSTASH_REDIS_REST_TOKEN),
+      KV_REST_API_TOKEN: Boolean(process.env.KV_REST_API_TOKEN),
+    },
+
+    메일수신: {
+      INGEST_SECRET_설정됨: ingestSecret.length > 0,
+      길이: ingestSecret.length,
+    },
+
+    디스코드: {
+      DISCORD_BOT_TOKEN_설정됨: botToken.length > 0,
+      토큰_길이: botToken.length,
+      DISCORD_CHANNELS_원본: process.env.DISCORD_CHANNELS ?? null,
+      해석된_채널: channels,
+      수집_가능: botToken.length > 0 && channels.length > 0,
+      안내:
+        botToken.length === 0
+          ? "DISCORD_BOT_TOKEN이 서버에 없습니다. 변수 추가 후 재배포했는지 확인하세요."
+          : channels.length === 0
+            ? "DISCORD_CHANNELS가 비어 있습니다. '채널ID:#이름' 형식인지 확인하세요."
+            : "설정 완료",
+    },
   };
 
   const url = new URL(request.url);
