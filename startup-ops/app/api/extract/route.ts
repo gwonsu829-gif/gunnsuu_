@@ -54,14 +54,19 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  // 대시보드에 키를 붙여넣을 때 줄바꿈이나 따옴표가 딸려오는 일이 잦다.
+  const apiKey = (process.env.ANTHROPIC_API_KEY ?? "")
+    .trim()
+    .replace(/^["']|["']$/g, "");
+
+  if (!apiKey) {
     return NextResponse.json(
-      demoResult(text, sampleId, today, "ANTHROPIC_API_KEY가 설정되지 않았습니다."),
+      demoResult(text, sampleId, today, "ANTHROPIC_API_KEY가 서버에 전달되지 않았습니다."),
     );
   }
 
   try {
-    const client = new Anthropic();
+    const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: 8000,
@@ -90,7 +95,7 @@ export async function POST(request: Request) {
   } catch (error) {
     const reason =
       error instanceof Anthropic.APIError
-        ? `Anthropic API 오류 (${error.status ?? "network"})`
+        ? `Anthropic API 오류 ${error.status ?? "(네트워크)"} — ${error.message}`
         : error instanceof Error
           ? error.message
           : "알 수 없는 오류";

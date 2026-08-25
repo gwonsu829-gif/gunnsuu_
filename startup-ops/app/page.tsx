@@ -131,9 +131,14 @@ export default function Page() {
           {demo && (
             <span
               title={demoReason ?? undefined}
-              className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800"
+              className="flex items-center gap-1.5 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-800"
             >
-              데모 모드
+              <span className="font-semibold">데모 모드</span>
+              {demoReason && (
+                <span className="max-w-[280px] truncate border-l border-amber-300 pl-1.5 font-normal text-amber-700">
+                  {demoReason}
+                </span>
+              )}
             </span>
           )}
           <span className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-500">
