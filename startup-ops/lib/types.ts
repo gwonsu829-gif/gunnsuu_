@@ -31,9 +31,18 @@ export interface ExtractedTask {
   status: Status;
 }
 
+export type TaskOrigin = "local" | "server";
+
 /** 화면에서 관리하는 할일. 클라이언트에서 id와 출처 원문을 덧붙인다. */
 export interface Task extends ExtractedTask {
   id: string;
+  /**
+   * local  — 이 브라우저에서 붙여넣어 뽑은 것. 새로고침하면 사라진다.
+   * server — 메일·디스코드로 자동 수집돼 저장소에 있는 것.
+   */
+  origin: TaskOrigin;
+  /** 어느 채널로 들어왔는지 */
+  channel: "manual" | "email" | "discord";
   /** 이 할일이 추출된 원문 전체 (근거 하이라이트에 사용) */
   rawText: string;
   /** 원문 라벨. 예: "CS 문의 메일" */

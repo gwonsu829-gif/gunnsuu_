@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import IntegrationStatus, { Integrations } from "@/components/IntegrationStatus";
 import KanbanBoard from "@/components/KanbanBoard";
 import SourcePanel from "@/components/SourcePanel";
 import SummaryStrip from "@/components/SummaryStrip";
@@ -24,6 +25,8 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [demo, setDemo] = useState(false);
   const [demoReason, setDemoReason] = useState<string | null>(null);
+  const [integrations, setIntegrations] = useState<Integrations | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const seq = useRef(0);
 
@@ -31,6 +34,37 @@ export default function Page() {
   // 선택한 카드의 근거는 그 카드가 추출된 원문이 화면에 떠 있을 때만 하이라이트한다.
   const highlight =
     selectedTask && selectedTask.rawText === text ? selectedTask.source : null;
+
+  /**
+   * 메일·디스코드로 들어와 저장소에 쌓인 할일을 불러온다.
+   * 붙여넣기로 뽑은 것(local)은 건드리지 않고 자동 수집분(server)만 교체한다.
+   */
+  const loadServerTasks = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/tasks", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        tasks: ServerTask[];
+        연동: Integrations;
+      };
+      setIntegrations(data.연동);
+      setTasks((prev) => [
+        ...prev.filter((t) => t.origin === "local"),
+        ...data.tasks.map(toTask),
+      ]);
+    } catch {
+      // 자동 수집을 못 읽어와도 붙여넣기 흐름은 계속 되어야 한다.
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadServerTasks();
+    const timer = window.setInterval(() => void loadServerTasks(), 30_000);
+    return () => window.clearInterval(timer);
+  }, [loadServerTasks]);
 
   function injectSample(sample: Sample) {
     setText(sample.text);
@@ -80,7 +114,9 @@ export default function Page() {
           seq.current += 1;
           next.push({
             ...extracted,
-            id: `t${seq.current}`,
+            id: `local-${seq.current}`,
+            origin: "local",
+            channel: "manual",
             rawText: text,
             sourceLabel,
             duplicateOf: dup?.id,
@@ -101,7 +137,19 @@ export default function Page() {
 
   /** AI가 정한 값을 사람이 덮어쓰는 유일한 경로. */
   function updateTask(id: string, patch: Partial<Task>) {
+    // 대상은 현재 렌더의 tasks에서 바로 찾는다.
+    // setTasks 콜백 안에서 꺼내면 그 콜백이 나중에 실행돼 아래 조건이 항상 빗나간다.
+    const target = tasks.find((t) => t.id === id);
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+    // 자동 수집분은 저장소에도 반영해야 새로고침 뒤에도 남는다.
+    // 화면은 이미 바뀌었으므로 실패해도 흐름을 막지 않는다.
+    if (target?.origin === "server") {
+      void fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, patch }),
+      }).catch(() => undefined);
+    }
   }
 
   function selectTask(id: string) {
@@ -149,6 +197,12 @@ export default function Page() {
 
       <SummaryStrip tasks={tasks} today={today} />
 
+      <IntegrationStatus
+        integrations={integrations}
+        syncing={syncing}
+        onRefresh={() => void loadServerTasks()}
+      />
+
       <div className="grid gap-3 lg:min-h-[560px] lg:grid-cols-2">
         <SourcePanel
           value={text}
@@ -170,6 +224,9 @@ export default function Page() {
           onPriorityChange={(id, priority: Priority) => updateTask(id, { priority })}
           onAssigneeChange={(id, assignee) => updateTask(id, { assignee })}
           onClear={() => {
+            if (tasks.some((t) => t.origin === "server")) {
+              void fetch("/api/tasks", { method: "DELETE" }).catch(() => undefined);
+            }
             setTasks([]);
             setSelectedId(null);
           }}
@@ -196,4 +253,42 @@ export default function Page() {
       </section>
     </main>
   );
+}
+
+/* ---------- 서버에서 오는 형태 ---------- */
+
+interface ServerTask {
+  id: string;
+  title: string;
+  role: Role;
+  priority: Priority;
+  dueDate: string;
+  assignee: string;
+  /** 판단 근거가 된 원문 문장 */
+  source: string;
+  status: Status;
+  /** 어느 채널로 들어왔는지 */
+  channel: "manual" | "email" | "discord";
+  sourceLabel: string;
+  rawText: string;
+  createdAt: string;
+  duplicateOf?: string;
+}
+
+function toTask(t: ServerTask): Task {
+  return {
+    title: t.title,
+    role: t.role,
+    priority: t.priority,
+    dueDate: t.dueDate,
+    assignee: t.assignee,
+    source: t.source,
+    status: t.status,
+    id: t.id,
+    origin: "server",
+    channel: t.channel,
+    rawText: t.rawText,
+    sourceLabel: t.sourceLabel,
+    duplicateOf: t.duplicateOf,
+  };
 }

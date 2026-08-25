@@ -37,11 +37,11 @@ const DUPLICATE_THRESHOLD = 0.5;
  * 여러 채널로 같은 일이 중복 인입되는 게 이 문제의 핵심이라
  * 자동 병합하지 않고 표시만 해서 사람이 판단하게 둔다.
  */
-export function findDuplicate(
+export function findDuplicateAmong<T extends { id: string; title: string }>(
   candidateTitle: string,
-  existing: Task[],
-): Task | undefined {
-  let best: Task | undefined;
+  existing: T[],
+): T | undefined {
+  let best: T | undefined;
   let bestScore = DUPLICATE_THRESHOLD;
   for (const task of existing) {
     const score = similarity(candidateTitle, task.title);
@@ -51,4 +51,11 @@ export function findDuplicate(
     }
   }
   return best;
+}
+
+export function findDuplicate(
+  candidateTitle: string,
+  existing: Task[],
+): Task | undefined {
+  return findDuplicateAmong(candidateTitle, existing);
 }

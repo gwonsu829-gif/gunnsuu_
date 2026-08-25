@@ -89,14 +89,25 @@ export default function TaskCard({
       </div>
 
       {task.source && (
-        <p className="mt-2 border-t border-dashed border-slate-200 pt-2 text-[11px] leading-relaxed text-slate-500">
-          <span className="font-medium text-slate-600">출처</span> ·{" "}
-          {task.sourceLabel} — “{truncate(task.source, 70)}”
+        <p className="mt-2 flex flex-wrap items-baseline gap-1 border-t border-dashed border-slate-200 pt-2 text-[11px] leading-relaxed text-slate-500">
+          <span className={`rounded border px-1 py-px text-[10px] font-medium ${CHANNEL_STYLE[task.channel].badge}`}>
+            {CHANNEL_STYLE[task.channel].label}
+          </span>
+          <span>
+            {task.sourceLabel} — “{truncate(task.source, 62)}”
+          </span>
         </p>
       )}
     </div>
   );
 }
+
+/** 자동 수집분과 직접 붙여넣은 것을 한눈에 구분한다. */
+const CHANNEL_STYLE: Record<Task["channel"], { label: string; badge: string }> = {
+  manual: { label: "직접 입력", badge: "border-slate-200 bg-slate-50 text-slate-500" },
+  email: { label: "메일", badge: "border-sky-200 bg-sky-50 text-sky-700" },
+  discord: { label: "디스코드", badge: "border-indigo-200 bg-indigo-50 text-indigo-700" },
+};
 
 function truncate(s: string, n: number) {
   return s.length > n ? `${s.slice(0, n)}…` : s;

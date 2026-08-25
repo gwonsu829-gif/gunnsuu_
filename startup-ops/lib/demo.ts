@@ -83,7 +83,9 @@ export function heuristicExtract(
     .map((s) => s.trim())
     .filter((s) => s.length >= 8 && s.length <= 200)
     // 디스코드 발화자 헤더("박서연 — 오전 10:12")는 할일이 아니다
-    .filter((s) => !/^[가-힣A-Za-z]{2,10}\s*[—-]\s*(오전|오후|\d)/.test(s));
+    .filter((s) => !/^[가-힣A-Za-z]{2,10}\s*[—-]\s*(오전|오후|\d)/.test(s))
+    // 메일 헤더도 마찬가지 (수신 웹훅이 본문 앞에 붙여 보낸다)
+    .filter((s) => !/^(보낸사람|받는사람|제목|From|To|Subject)\s*:/i.test(s));
 
   const picked = sentences.filter((s) => ACTION_CUES.some((c) => s.includes(c)));
 
