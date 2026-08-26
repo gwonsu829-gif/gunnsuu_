@@ -40,10 +40,38 @@ export default function IntegrationStatus({
 }) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [digest, setDigest] = useState<string | null>(null);
 
   if (!integrations) return null;
 
   const 저장소켜짐 = integrations.저장소 === "redis";
+
+  /** 아침에 나갈 요약을 지금 확인하거나 보낸다. */
+  async function runDigest(send: boolean) {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch(`/api/digest/run${send ? "?send=1" : ""}`, {
+        method: "POST",
+      });
+      const data = (await res.json()) as {
+        본문?: string;
+        전송?: string;
+        error?: string;
+        안내?: string;
+      };
+      if (data.본문) setDigest(data.본문);
+      if (!res.ok) {
+        setTestResult(`${data.error ?? "실패"}${data.안내 ? ` — ${data.안내}` : ""}`);
+      } else if (send) {
+        setTestResult("디스코드로 보냈습니다");
+      }
+    } catch {
+      setTestResult("요청을 보내지 못했습니다.");
+    } finally {
+      setTesting(false);
+    }
+  }
 
   /** 크론을 기다리지 않고 지금 디스코드를 훑는다. */
   async function collectDiscord() {
@@ -156,7 +184,50 @@ export default function IntegrationStatus({
         </span>
       )}
 
+      {digest && (
+        <div className="order-last w-full rounded border border-slate-200 bg-slate-50 p-2.5">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-slate-600">
+              아침에 나갈 내용
+            </span>
+            <div className="flex items-center gap-1">
+              {integrations.디스코드 && (
+                <button
+                  type="button"
+                  onClick={() => void runDigest(true)}
+                  disabled={testing}
+                  className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] text-slate-600 hover:border-slate-500 disabled:opacity-50"
+                >
+                  지금 디스코드로 보내기
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setDigest(null)}
+                className="rounded px-1.5 py-0.5 text-[11px] text-slate-400 hover:text-slate-700"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+          <pre className="thin-scroll max-h-56 overflow-auto whitespace-pre-wrap break-words font-sans text-[11.5px] leading-relaxed text-slate-700">
+            {digest}
+          </pre>
+        </div>
+      )}
+
       <div className="ml-auto flex items-center gap-1.5">
+        {integrations.메일 && (
+          <button
+            type="button"
+            onClick={() => void runDigest(false)}
+            disabled={testing}
+            title="아침에 나갈 요약을 지금 확인합니다"
+            className="rounded border border-slate-300 px-2 py-1 text-[11px] text-slate-600 hover:border-slate-500 hover:text-slate-900 disabled:opacity-50"
+          >
+            아침 요약 보기
+          </button>
+        )}
         {integrations.디스코드 && (
           <button
             type="button"

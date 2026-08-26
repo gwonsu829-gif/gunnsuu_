@@ -206,3 +206,31 @@ export async function fetchThreads(
 
   return Array.from(found.values());
 }
+
+/** 아침 요약을 보낼 채널. 없으면 수집 채널 중 첫 번째를 쓴다. */
+export function readDigestChannelId(): string | null {
+  const explicit = (process.env.DISCORD_DIGEST_CHANNEL ?? "").trim();
+  if (explicit) return explicit;
+  return readChannelConfig()[0]?.id ?? null;
+}
+
+export async function sendMessage(
+  token: string,
+  channelId: string,
+  content: string,
+): Promise<void> {
+  const res = await fetch(`${API}/channels/${channelId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bot ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(
+      `디스코드 전송 ${res.status}${detail ? ` — ${detail.slice(0, 200)}` : ""}`,
+    );
+  }
+}
