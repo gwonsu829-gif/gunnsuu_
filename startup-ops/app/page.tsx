@@ -180,13 +180,13 @@ export default function Page() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-3 p-4">
+    <main className="mx-auto flex min-h-screen max-w-[1440px] flex-col gap-4 px-5 py-6">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-baseline gap-2">
-          <h1 className="text-[15px] font-semibold text-slate-900">
+        <div className="flex items-baseline gap-2.5">
+          <h1 className="text-[17px] font-bold tracking-[-0.015em] text-ink">
             업무 자동 분류 대시보드
           </h1>
-          <p className="text-[12px] text-slate-500">
+          <p className="text-[12.5px] text-ink-3">
             흩어진 원문에서 할일을 추출해 직무별로 모읍니다
           </p>
         </div>
@@ -194,17 +194,17 @@ export default function Page() {
           {demo && (
             <span
               title={demoReason ?? undefined}
-              className="flex items-center gap-1.5 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-800"
+              className="flex items-center gap-1.5 rounded border border-warn-line bg-warn-soft px-2 py-1 text-[11px] text-warn"
             >
               <span className="font-semibold">데모 모드</span>
               {demoReason && (
-                <span className="max-w-[280px] truncate border-l border-amber-300 pl-1.5 font-normal text-amber-700">
+                <span className="max-w-[280px] truncate border-l border-warn-line pl-1.5 font-normal text-warn">
                   {demoReason}
                 </span>
               )}
             </span>
           )}
-          <span className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-500">
+          <span className="num rounded border border-line bg-surface px-2 py-1 text-[11px] text-ink-3">
             기준일 {today}
           </span>
         </div>
@@ -218,7 +218,7 @@ export default function Page() {
         onRefresh={() => void loadServerTasks()}
       />
 
-      <nav className="flex items-center gap-1 border-b border-slate-200">
+      <nav className="flex items-center gap-0.5 border-b border-line">
         {([
           ["today", "오늘", tasks.filter((t) => t.status !== "완료").length],
           ["inbox", "인입", tasks.length],
@@ -228,16 +228,20 @@ export default function Page() {
             type="button"
             onClick={() => setTab(key)}
             aria-current={tab === key}
-            className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium transition
+            className={`-mb-px flex items-center gap-1.5 border-b-2 px-3.5 py-2.5 text-[13.5px] font-medium transition
               ${
                 tab === key
-                  ? "border-slate-900 text-slate-900"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "border-accent text-accent"
+                  : "border-transparent text-ink-3 hover:text-ink-2"
               }`}
           >
             {label}
             {count > 0 && (
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">
+              <span
+                className={`num rounded px-1.5 py-0.5 text-[11px] ${
+                  tab === key ? "bg-accent-soft text-accent" : "bg-sunk text-ink-3"
+                }`}
+              >
                 {count}
               </span>
             )}
@@ -292,10 +296,10 @@ export default function Page() {
 
       <section className="space-y-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-[13px] font-semibold text-slate-900">
+          <h2 className="text-[13px] font-semibold text-ink">
             직무별 칸반
           </h2>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-ink-4">
             카드를 끌어 상태를 바꾸고, 다른 직무 레인에 놓으면 직무도 함께
             바뀝니다
           </p>

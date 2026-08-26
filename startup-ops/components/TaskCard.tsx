@@ -36,11 +36,11 @@ export default function TaskCard({
   return (
     <div
       onClick={() => onSelect(task.id)}
-      className={`rounded-md border bg-white p-3 shadow-card transition
+      className={`rounded-md border bg-surface p-3 shadow-card transition
         ${
           selected
-            ? "border-slate-900 ring-1 ring-slate-900"
-            : "border-slate-200 hover:border-slate-400"
+            ? "border-accent ring-1 ring-accent"
+            : "border-line hover:border-ink-4"
         }`}
     >
       <div className="flex items-start justify-between gap-2">
@@ -51,12 +51,12 @@ export default function TaskCard({
             onSelect(task.id);
           }}
           aria-pressed={selected}
-          className="flex-1 text-left text-[13px] font-semibold leading-snug text-slate-900"
+          className="flex-1 text-left text-[13px] font-semibold leading-snug text-ink"
         >
           {task.title}
         </button>
         {task.duplicateOf && (
-          <span className="shrink-0 rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium leading-none text-slate-600">
+          <span className="shrink-0 rounded border border-line-strong bg-sunk px-1.5 py-0.5 text-[10px] font-medium leading-none text-ink-2">
             중복 의심
           </span>
         )}
@@ -85,8 +85,8 @@ export default function TaskCard({
           onChange={(v) => onAssigneeChange(task.id, v)}
           className={
             unassigned
-              ? "border-orange-200 bg-orange-50 text-orange-700"
-              : "border-slate-200 bg-white text-slate-600"
+              ? "border-warn-line bg-warn-soft text-warn"
+              : "border-line bg-surface text-ink-2"
           }
           title={teamRole ? `담당자 변경 (${task.assignee} · ${teamRole})` : "담당자 지정"}
         />
@@ -100,7 +100,7 @@ export default function TaskCard({
       )}
 
       {task.source && (
-        <p className="mt-2 flex flex-wrap items-baseline gap-1 border-t border-dashed border-slate-200 pt-2 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-2 flex flex-wrap items-baseline gap-1 border-t border-dashed border-line pt-2 text-[11px] leading-relaxed text-ink-3">
           <span className={`rounded border px-1 py-px text-[10px] font-medium ${CHANNEL_STYLE[task.channel].badge}`}>
             {CHANNEL_STYLE[task.channel].label}
           </span>
@@ -115,7 +115,7 @@ export default function TaskCard({
 
 /** 자동 수집분과 직접 붙여넣은 것을 한눈에 구분한다. */
 const CHANNEL_STYLE: Record<Task["channel"], { label: string; badge: string }> = {
-  manual: { label: "직접 입력", badge: "border-slate-200 bg-slate-50 text-slate-500" },
+  manual: { label: "직접 입력", badge: "border-line bg-sunk text-ink-3" },
   email: { label: "메일", badge: "border-sky-200 bg-sky-50 text-sky-700" },
   discord: { label: "디스코드", badge: "border-indigo-200 bg-indigo-50 text-indigo-700" },
 };

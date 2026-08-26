@@ -44,7 +44,7 @@ export default function AssigneeSuggestionRow({
         <button
           type="button"
           onClick={() => onAccept(suggestion.assignee)}
-          className="rounded border border-violet-300 bg-white px-1.5 py-0.5 text-[11px] font-medium text-violet-700 hover:border-violet-500"
+          className="rounded border border-violet-300 bg-surface px-1.5 py-0.5 text-[11px] font-medium text-violet-700 hover:border-violet-500"
         >
           지정
         </button>

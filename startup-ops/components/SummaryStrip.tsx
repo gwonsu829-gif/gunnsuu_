@@ -12,40 +12,44 @@ export default function SummaryStrip({
   today: string;
 }) {
   const stats = [
-    { label: "총 할일", value: tasks.length, tone: "text-slate-900" },
+    { label: "총 할일", value: tasks.length, tone: "text-ink" },
     {
       label: "높은 우선순위",
       value: tasks.filter((t) => t.priority === "높음").length,
-      tone: "text-red-600",
+      tone: "text-critical",
     },
     {
       label: "오늘 마감",
       value: tasks.filter((t) => isDueToday(t.dueDate, today)).length,
-      tone: "text-orange-600",
+      tone: "text-warn",
     },
     {
       label: "기한 지남",
       value: tasks.filter((t) => isOverdue(t.dueDate, today)).length,
-      tone: "text-red-600",
+      tone: "text-critical",
     },
     {
       label: "담당자 미지정",
       value: tasks.filter((t) => t.assignee === UNASSIGNED).length,
-      tone: "text-orange-600",
+      tone: "text-warn",
     },
     {
       label: "완료",
       value: tasks.filter((t) => t.status === "완료").length,
-      tone: "text-emerald-600",
+      tone: "text-good",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-slate-200 bg-slate-200 sm:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line shadow-card sm:grid-cols-3 lg:grid-cols-6">
       {stats.map((s) => (
-        <div key={s.label} className="bg-white px-3 py-2">
-          <p className="text-[11px] text-slate-500">{s.label}</p>
-          <p className={`mt-0.5 text-lg font-semibold leading-none ${s.tone}`}>
+        <div key={s.label} className="bg-surface px-3.5 py-2.5">
+          <p className="text-[11px] font-medium text-ink-3">{s.label}</p>
+          <p
+            className={`num mt-1 text-[21px] font-semibold leading-none tracking-[-0.02em] ${
+              s.value === 0 ? "text-ink-4" : s.tone
+            }`}
+          >
             {s.value}
           </p>
         </div>

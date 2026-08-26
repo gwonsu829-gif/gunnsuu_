@@ -40,9 +40,9 @@ export default function SourcePanel({
   }, [segments, highlight]);
 
   return (
-    <section className="flex min-h-0 flex-col rounded-md border border-slate-200 bg-white">
-      <header className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2">
-        <h2 className="text-[13px] font-semibold text-slate-900">원문 입력</h2>
+    <section className="flex min-h-0 flex-col rounded-md border border-line bg-surface">
+      <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
+        <h2 className="text-[13px] font-semibold text-ink">원문 입력</h2>
         <div className="flex flex-wrap gap-1">
           {samples.map((sample) => (
             <button
@@ -53,8 +53,8 @@ export default function SourcePanel({
               className={`rounded border px-2 py-1 text-[11px] font-medium transition
                 ${
                   activeSampleId === sample.id
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-300 bg-white text-slate-600 hover:border-slate-500 hover:text-slate-900"
+                    ? "border-accent bg-accent text-white"
+                    : "border-line-strong bg-surface text-ink-2 hover:border-ink-4 hover:text-ink"
                 }`}
             >
               {sample.label}
@@ -71,12 +71,12 @@ export default function SourcePanel({
             onClick={onExitHighlight}
             onKeyDown={(e) => e.key === "Enter" && onExitHighlight()}
             title="클릭하면 편집 모드로 돌아갑니다"
-            className="thin-scroll h-full w-full cursor-text overflow-auto whitespace-pre-wrap break-words p-3 text-[13px] leading-relaxed text-slate-700"
+            className="thin-scroll h-full w-full cursor-text overflow-auto whitespace-pre-wrap break-words p-3 text-[13px] leading-relaxed text-ink-2"
           >
             {segments.before}
             <mark
               ref={markRef}
-              className="rounded bg-yellow-200 px-0.5 py-px text-slate-900 ring-1 ring-yellow-400"
+              className="rounded bg-yellow-200 px-0.5 py-px text-ink ring-1 ring-yellow-400"
             >
               {segments.match}
             </mark>
@@ -88,7 +88,7 @@ export default function SourcePanel({
             onChange={(e) => onChange(e.target.value)}
             spellCheck={false}
             placeholder="메일 원문이나 디스코드 대화를 붙여넣으세요"
-            className="thin-scroll h-full w-full resize-none border-0 p-3 text-[13px] leading-relaxed text-slate-700 outline-none placeholder:text-slate-400"
+            className="thin-scroll h-full w-full resize-none border-0 p-3 text-[13px] leading-relaxed text-ink-2 outline-none placeholder:text-ink-4"
           />
         )}
 
@@ -99,21 +99,21 @@ export default function SourcePanel({
         )}
       </div>
 
-      <footer className="border-t border-slate-200 px-3 py-2">
+      <footer className="border-t border-line px-3 py-2">
         {error && (
-          <p className="mb-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] text-red-700">
+          <p className="mb-2 rounded border border-critical-line bg-critical-soft px-2 py-1 text-[11px] text-critical">
             {error}
           </p>
         )}
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-ink-4">
             {value.length.toLocaleString()}자
           </span>
           <button
             type="button"
             onClick={onExtract}
             disabled={loading || value.trim().length === 0}
-            className="inline-flex items-center gap-2 rounded bg-slate-900 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="inline-flex items-center gap-2 rounded bg-accent px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-accent disabled:cursor-not-allowed disabled:bg-line-strong"
           >
             {loading && (
               <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />

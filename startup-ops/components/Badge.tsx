@@ -30,9 +30,9 @@ export function MetaBadge({
   tone?: "default" | "warn" | "danger";
 }) {
   const tones = {
-    default: "bg-white text-slate-500 border-slate-200",
-    warn: "bg-orange-50 text-orange-700 border-orange-200",
-    danger: "bg-red-50 text-red-700 border-red-200",
+    default: "bg-surface text-ink-3 border-line",
+    warn: "bg-warn-soft text-warn border-warn-line",
+    danger: "bg-critical-soft text-critical border-critical-line",
   } as const;
   return (
     <span

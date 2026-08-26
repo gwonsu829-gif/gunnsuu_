@@ -30,7 +30,7 @@ export default function KanbanBoard({
 
   if (tasks.length === 0) {
     return (
-      <div className="rounded-md border border-dashed border-slate-300 bg-white px-3 py-10 text-center text-[12px] text-slate-400">
+      <div className="rounded-md border border-dashed border-line-strong bg-surface px-3 py-10 text-center text-[12px] text-ink-4">
         할일을 추출하면 직무별 칸반이 여기에 나타납니다.
       </div>
     );
@@ -43,19 +43,19 @@ export default function KanbanBoard({
         return (
           <div
             key={role}
-            className="overflow-hidden rounded-md border border-slate-200 bg-white"
+            className="overflow-hidden rounded-md border border-line bg-surface"
           >
-            <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5">
+            <div className="flex items-center gap-2 border-b border-line bg-sunk px-3 py-1.5">
               <span className={`h-2 w-2 rounded-full ${ROLE_STYLE[role].dot}`} />
-              <span className="text-[12px] font-semibold text-slate-800">
+              <span className="text-[12px] font-semibold text-ink">
                 {role}
               </span>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-ink-4">
                 {laneTasks.length}건
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-px bg-slate-200">
+            <div className="grid grid-cols-3 gap-px bg-line">
               {STATUSES.map((status) => {
                 const cellKey = `${role}:${status}`;
                 const cellTasks = laneTasks.filter((t) => t.status === status);
@@ -78,17 +78,17 @@ export default function KanbanBoard({
                       setDraggingId(null);
                     }}
                     className={`min-h-[92px] p-2 transition-colors ${
-                      hovered === cellKey ? "bg-slate-100" : "bg-white"
+                      hovered === cellKey ? "bg-sunk" : "bg-surface"
                     }`}
                   >
                     <div className="mb-1.5 flex items-center gap-1.5">
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${STATUS_META[status].accent}`}
                       />
-                      <span className="text-[11px] font-medium text-slate-500">
+                      <span className="text-[11px] font-medium text-ink-3">
                         {STATUS_META[status].label}
                       </span>
-                      <span className="text-[11px] text-slate-300">
+                      <span className="text-[11px] text-ink-4">
                         {cellTasks.length}
                       </span>
                     </div>
@@ -111,17 +111,17 @@ export default function KanbanBoard({
                               setHovered(null);
                             }}
                             onClick={() => onSelect(task.id)}
-                            className={`cursor-grab rounded border bg-white p-2 shadow-card active:cursor-grabbing
+                            className={`cursor-grab rounded border bg-surface p-2 shadow-card active:cursor-grabbing
                               ${
                                 selectedId === task.id
-                                  ? "border-slate-900 ring-1 ring-slate-900"
-                                  : "border-slate-200 hover:border-slate-400"
+                                  ? "border-accent ring-1 ring-accent"
+                                  : "border-line hover:border-ink-4"
                               }
                               ${draggingId === task.id ? "opacity-40" : ""}
                               ${status === "완료" ? "opacity-70" : ""}`}
                           >
                             <p
-                              className={`text-[12px] font-medium leading-snug text-slate-800 ${
+                              className={`text-[12px] font-medium leading-snug text-ink ${
                                 status === "완료" ? "line-through" : ""
                               }`}
                             >

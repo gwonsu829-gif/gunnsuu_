@@ -16,12 +16,12 @@ function Lamp({ on, label, note }: { on: boolean; label: string; note?: string }
       title={note}
       className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] ${
         on
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-          : "border-slate-200 bg-slate-50 text-slate-500"
+          ? "border-good-line bg-good-soft text-good"
+          : "border-line bg-sunk text-ink-3"
       }`}
     >
       <span
-        className={`h-1.5 w-1.5 rounded-full ${on ? "bg-emerald-500" : "bg-slate-300"}`}
+        className={`h-1.5 w-1.5 rounded-full ${on ? "bg-good-soft0" : "bg-line-strong"}`}
       />
       <span className="font-medium">{label}</span>
       <span className="text-[10px] opacity-80">{on ? "연결됨" : "미설정"}</span>
@@ -142,8 +142,8 @@ export default function IntegrationStatus({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2">
-      <span className="text-[11px] font-semibold text-slate-600">연동 상태</span>
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface px-3 py-2">
+      <span className="text-[11px] font-semibold text-ink-2">연동 상태</span>
 
       <Lamp on={integrations.AI} label="AI 추출" note="ANTHROPIC_API_KEY" />
       <Lamp on={integrations.메일} label="메일 수신" note="INGEST_SECRET" />
@@ -167,27 +167,27 @@ export default function IntegrationStatus({
       />
 
       {!저장소켜짐 && (
-        <span className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+        <span className="rounded border border-warn-line bg-warn-soft px-2 py-1 text-[11px] text-warn">
           저장소가 없어 자동 수집분이 유지되지 않습니다
         </span>
       )}
 
       {integrations.디스코드_채널.length > 0 && (
-        <span className="text-[11px] text-slate-400">
+        <span className="text-[11px] text-ink-4">
           {integrations.디스코드_채널.join(" · ")}
         </span>
       )}
 
       {testResult && (
-        <span className="max-w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
+        <span className="max-w-full rounded border border-line bg-sunk px-2 py-1 text-[11px] text-ink-2">
           {testResult}
         </span>
       )}
 
       {digest && (
-        <div className="order-last w-full rounded border border-slate-200 bg-slate-50 p-2.5">
+        <div className="order-last w-full rounded border border-line bg-sunk p-2.5">
           <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold text-slate-600">
+            <span className="text-[11px] font-semibold text-ink-2">
               아침에 나갈 내용
             </span>
             <div className="flex items-center gap-1">
@@ -196,7 +196,7 @@ export default function IntegrationStatus({
                   type="button"
                   onClick={() => void runDigest(true)}
                   disabled={testing}
-                  className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] text-slate-600 hover:border-slate-500 disabled:opacity-50"
+                  className="rounded border border-line-strong bg-surface px-1.5 py-0.5 text-[11px] text-ink-2 hover:border-ink-4 disabled:opacity-50"
                 >
                   지금 디스코드로 보내기
                 </button>
@@ -204,13 +204,13 @@ export default function IntegrationStatus({
               <button
                 type="button"
                 onClick={() => setDigest(null)}
-                className="rounded px-1.5 py-0.5 text-[11px] text-slate-400 hover:text-slate-700"
+                className="rounded px-1.5 py-0.5 text-[11px] text-ink-4 hover:text-ink-2"
               >
                 닫기
               </button>
             </div>
           </div>
-          <pre className="thin-scroll max-h-56 overflow-auto whitespace-pre-wrap break-words font-sans text-[11.5px] leading-relaxed text-slate-700">
+          <pre className="thin-scroll max-h-56 overflow-auto whitespace-pre-wrap break-words font-sans text-[11.5px] leading-relaxed text-ink-2">
             {digest}
           </pre>
         </div>
@@ -223,7 +223,7 @@ export default function IntegrationStatus({
             onClick={() => void runDigest(false)}
             disabled={testing}
             title="아침에 나갈 요약을 지금 확인합니다"
-            className="rounded border border-slate-300 px-2 py-1 text-[11px] text-slate-600 hover:border-slate-500 hover:text-slate-900 disabled:opacity-50"
+            className="rounded border border-line-strong px-2 py-1 text-[11px] text-ink-2 hover:border-ink-4 hover:text-ink disabled:opacity-50"
           >
             아침 요약 보기
           </button>
@@ -234,7 +234,7 @@ export default function IntegrationStatus({
             onClick={() => void collectDiscord()}
             disabled={testing}
             title="크론을 기다리지 않고 지금 채널을 훑습니다"
-            className="rounded border border-slate-300 px-2 py-1 text-[11px] text-slate-600 hover:border-slate-500 hover:text-slate-900 disabled:opacity-50"
+            className="rounded border border-line-strong px-2 py-1 text-[11px] text-ink-2 hover:border-ink-4 hover:text-ink disabled:opacity-50"
           >
             {testing ? "수집 중" : "디스코드 지금 수집"}
           </button>
@@ -245,7 +245,7 @@ export default function IntegrationStatus({
             onClick={() => void runTest()}
             disabled={testing}
             title="메일이 들어온 상황을 흉내내 수집 경로 전체를 확인합니다"
-            className="rounded border border-slate-300 px-2 py-1 text-[11px] text-slate-600 hover:border-slate-500 hover:text-slate-900 disabled:opacity-50"
+            className="rounded border border-line-strong px-2 py-1 text-[11px] text-ink-2 hover:border-ink-4 hover:text-ink disabled:opacity-50"
           >
             {testing ? "보내는 중" : "메일 수신 테스트"}
           </button>
@@ -254,7 +254,7 @@ export default function IntegrationStatus({
           type="button"
           onClick={onRefresh}
           disabled={syncing}
-          className="rounded border border-slate-300 px-2 py-1 text-[11px] text-slate-600 hover:border-slate-500 hover:text-slate-900 disabled:opacity-50"
+          className="rounded border border-line-strong px-2 py-1 text-[11px] text-ink-2 hover:border-ink-4 hover:text-ink disabled:opacity-50"
         >
           {syncing ? "불러오는 중" : "지금 새로고침"}
         </button>

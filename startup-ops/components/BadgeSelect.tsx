@@ -26,10 +26,10 @@ export default function BadgeSelect({
         // 카드 클릭(선택/하이라이트)과 드롭다운 조작이 겹치지 않게 막는다.
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
-        className="cursor-pointer appearance-none bg-transparent py-0.5 pl-1.5 pr-4 text-[11px] font-medium leading-none text-inherit outline-none focus:ring-1 focus:ring-slate-400"
+        className="cursor-pointer appearance-none bg-transparent py-0.5 pl-1.5 pr-4 text-[11px] font-medium leading-none text-inherit outline-none focus:ring-1 focus:ring-accent"
       >
         {options.map((opt) => (
-          <option key={opt} value={opt} className="text-slate-900">
+          <option key={opt} value={opt} className="text-ink">
             {opt}
           </option>
         ))}

@@ -6,47 +6,47 @@ import { Priority, Role, Status } from "./types";
  */
 export const ROLE_STYLE: Record<Role, { badge: string; dot: string }> = {
   대표: {
-    badge: "bg-slate-100 text-slate-700 border-slate-300",
-    dot: "bg-slate-500",
+    badge: "bg-sunk text-ink-2 border-line-strong",
+    dot: "bg-ink-3",
   },
   CS: {
-    badge: "bg-sky-50 text-sky-700 border-sky-200",
-    dot: "bg-sky-500",
+    badge: "bg-[#f0f6f9] text-[#2c556d] border-[#d1e1ea]",
+    dot: "bg-[#4187af]",
   },
   Sales: {
-    badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    dot: "bg-emerald-500",
+    badge: "bg-[#f0f9f5] text-[#2c6d4f] border-[#d1eadf]",
+    dot: "bg-[#41af7c]",
   },
   개발: {
-    badge: "bg-indigo-50 text-indigo-700 border-indigo-200",
-    dot: "bg-indigo-500",
+    badge: "bg-[#f1f0f9] text-[#322c6d] border-[#d3d1ea]",
+    dot: "bg-[#4a41af]",
   },
   마케팅: {
-    badge: "bg-amber-50 text-amber-700 border-amber-200",
-    dot: "bg-amber-500",
+    badge: "bg-[#f9f6f0] text-[#6d532c] border-[#eae0d1]",
+    dot: "bg-[#af8341]",
   },
   CX: {
-    badge: "bg-rose-50 text-rose-700 border-rose-200",
-    dot: "bg-rose-500",
+    badge: "bg-[#f9f0f3] text-[#6d2c3e] border-[#ead1d8]",
+    dot: "bg-[#af415e]",
   },
   "R&D": {
-    badge: "bg-violet-50 text-violet-700 border-violet-200",
-    dot: "bg-violet-500",
+    badge: "bg-[#f6f0f9] text-[#572c6d] border-[#e2d1ea]",
+    dot: "bg-[#8a41af]",
   },
   지원사업: {
-    badge: "bg-teal-50 text-teal-700 border-teal-200",
-    dot: "bg-teal-500",
+    badge: "bg-[#f0f9f9] text-[#2c6d6a] border-[#d1eaea]",
+    dot: "bg-[#41afab]",
   },
   경영지원: {
-    badge: "bg-stone-100 text-stone-700 border-stone-300",
-    dot: "bg-stone-500",
+    badge: "bg-[#f9f4f0] text-[#6d442c] border-[#eadad1]",
+    dot: "bg-[#af6941]",
   },
 };
 
 export const PRIORITY_STYLE: Record<Priority, string> = {
-  높음: "bg-red-50 text-red-700 border-red-200",
-  중간: "bg-amber-50 text-amber-700 border-amber-200",
-  낮음: "bg-slate-50 text-slate-500 border-slate-200",
+  높음: "bg-critical-soft text-critical border-critical-line",
+  중간: "bg-warn-soft text-warn border-warn-line",
+  낮음: "bg-sunk text-ink-3 border-line",
 };
 
 export const PRIORITY_ORDER: Record<Priority, number> = {
@@ -56,7 +56,7 @@ export const PRIORITY_ORDER: Record<Priority, number> = {
 };
 
 export const STATUS_META: Record<Status, { label: string; accent: string }> = {
-  미처리: { label: "미처리", accent: "bg-slate-400" },
-  진행중: { label: "진행중", accent: "bg-blue-500" },
-  완료: { label: "완료", accent: "bg-emerald-500" },
+  미처리: { label: "미처리", accent: "bg-ink-4" },
+  진행중: { label: "진행중", accent: "bg-accent" },
+  완료: { label: "완료", accent: "bg-good" },
 };
