@@ -24,12 +24,11 @@ interface Props {
  * "오늘 뭐부터 해야 하나"에 답한다.
  */
 const BUCKETS = [
-  { key: "overdue", label: "기한 지남", tone: "text-critical", marker: "bg-critical", test: (d: number | null) => d !== null && d < 0 },
-  { key: "today", label: "오늘", tone: "text-warn", marker: "bg-warn", test: (d: number | null) => d === 0 },
-  { key: "tomorrow", label: "내일", tone: "text-ink", marker: "bg-ink-3", test: (d: number | null) => d === 1 },
-  { key: "week", label: "이번 주", tone: "text-ink-2", marker: "bg-ink-4", test: (d: number | null) => d !== null && d >= 2 && d <= 6 },
+  { key: "overdue", label: "지연", tone: "text-critical", marker: "bg-critical", test: (d: number | null) => d !== null && d < 0 },
+  { key: "today", label: "오늘 마감", tone: "text-warn", marker: "bg-warn", test: (d: number | null) => d === 0 },
+  { key: "week", label: "이번 주", tone: "text-ink-2", marker: "bg-ink-4", test: (d: number | null) => d !== null && d >= 1 && d <= 6 },
   { key: "later", label: "그 이후", tone: "text-ink-3", marker: "bg-line-strong", test: (d: number | null) => d !== null && d >= 7 },
-  { key: "none", label: "마감 미정", tone: "text-ink-3", marker: "bg-line-strong", test: (d: number | null) => d === null },
+  { key: "none", label: "기한 미정", tone: "text-ink-3", marker: "bg-line-strong", test: (d: number | null) => d === null },
 ] as const;
 
 export default function PlannerView({
@@ -61,6 +60,15 @@ export default function PlannerView({
     return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
   });
 
+  const active = tasks.filter((task) => task.status !== "완료");
+  const ddayCount = active.filter((task) => daysUntil(task.dueDate, today) === 0).length;
+  const overdueCount = active.filter((task) => {
+    const days = daysUntil(task.dueDate, today);
+    return days !== null && days < 0;
+  }).length;
+  const undatedCount = active.filter((task) => daysUntil(task.dueDate, today) === null).length;
+  const todayNeedCount = ddayCount + overdueCount;
+
   const [y, m, d] = today.split("-");
 
   return (
@@ -71,8 +79,37 @@ export default function PlannerView({
         </p>
         <h2 className="mt-0.5 text-[15px] font-semibold text-ink">오늘의 할일</h2>
         <p className="mt-0.5 text-[12px] text-ink-3">
-          메일과 디스코드에서 모인 할일을 마감이 가까운 순으로 정리했습니다.
+          메일과 디스코드에서 모인 잔여 할일을 마감 기준으로 정리했습니다.
         </p>
+
+        {tasks.length > 0 && (
+          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+            <SummaryCard
+              label="오늘 처리 필요"
+              value={todayNeedCount}
+              hint="지연 + 오늘 마감"
+              tone="critical"
+            />
+            <SummaryCard
+              label="D-Day"
+              value={ddayCount}
+              hint="오늘 마감"
+              tone="warn"
+            />
+            <SummaryCard
+              label="지연"
+              value={overdueCount}
+              hint="기한 초과"
+              tone="critical"
+            />
+            <SummaryCard
+              label="기한 미정"
+              value={undatedCount}
+              hint="마감 확인 필요"
+              tone="neutral"
+            />
+          </div>
+        )}
       </header>
 
       {tasks.length === 0 ? (
@@ -115,10 +152,46 @@ export default function PlannerView({
               </div>
             );
           })}
-
         </div>
       )}
     </section>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  tone: "critical" | "warn" | "neutral";
+}) {
+  const toneClass =
+    tone === "critical"
+      ? "border-critical-line bg-critical-soft"
+      : tone === "warn"
+        ? "border-warn-line bg-warn-soft"
+        : "border-line bg-sunk";
+  const valueClass =
+    tone === "critical"
+      ? "text-critical"
+      : tone === "warn"
+        ? "text-warn"
+        : "text-ink-2";
+
+  return (
+    <div className={`rounded-md border px-3 py-2.5 ${toneClass}`}>
+      <div className="flex items-end justify-between gap-2">
+        <span className="text-[11px] font-medium text-ink-3">{label}</span>
+        <span className={`num text-[20px] font-semibold leading-none ${valueClass}`}>
+          {value}
+        </span>
+      </div>
+      <p className="mt-1 text-[10.5px] text-ink-4">{hint}</p>
+    </div>
   );
 }
 
