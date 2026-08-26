@@ -45,6 +45,10 @@ export interface CaseResult {
   오탐: string[];
   마감_맞음: number;
   직무_맞음: number;
+  /** 무엇이 왜 틀렸는지 보이지 않으면 고칠 수 없다. 뽑힌 것을 그대로 남긴다. */
+  뽑은_할일: string[];
+  틀린_직무: string[];
+  틀린_마감: string[];
   오류?: string;
 }
 
@@ -67,6 +71,9 @@ async function runCase(c: EvalCase, today: string): Promise<CaseResult> {
     오탐: [],
     마감_맞음: 0,
     직무_맞음: 0,
+    뽑은_할일: [],
+    틀린_직무: [],
+    틀린_마감: [],
   };
 
   const outcome = await runExtraction(c.text, today);
@@ -76,6 +83,7 @@ async function runCase(c: EvalCase, today: string): Promise<CaseResult> {
   }
 
   const tasks = outcome.tasks;
+  base.뽑은_할일 = tasks.map((t) => `${t.title} [${t.role} · ${t.dueDate}]`);
   const used = new Set<number>();
 
   /*
@@ -95,8 +103,14 @@ async function runCase(c: EvalCase, today: string): Promise<CaseResult> {
     }
     used.add(idx);
     base.잡음 += 1;
-    if (tasks[idx].dueDate === resolveDue(exp.due, today)) base.마감_맞음 += 1;
-    if (roleOk(exp, tasks[idx].role)) base.직무_맞음 += 1;
+
+    const got = tasks[idx];
+    const wantDue = resolveDue(exp.due, today);
+    if (got.dueDate === wantDue) base.마감_맞음 += 1;
+    else base.틀린_마감.push(`${got.title}: ${got.dueDate} (정답 ${wantDue})`);
+
+    if (roleOk(exp, got.role)) base.직무_맞음 += 1;
+    else base.틀린_직무.push(`${got.title}: ${got.role} (정답 ${exp.role})`);
   }
 
   tasks.forEach((t, i) => {

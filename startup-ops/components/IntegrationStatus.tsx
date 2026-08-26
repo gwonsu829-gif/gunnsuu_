@@ -42,6 +42,9 @@ interface EvalReport {
     잡음: number;
     놓침: string[];
     오탐: string[];
+    뽑은_할일: string[];
+    틀린_직무: string[];
+    틀린_마감: string[];
     오류?: string;
   }[];
 }
@@ -260,7 +263,7 @@ export default function IntegrationStatus({
             ))}
           </div>
 
-          <div className="thin-scroll max-h-44 overflow-auto">
+          <div className="thin-scroll max-h-72 overflow-auto">
             <table className="w-full text-left text-[11px]">
               <thead className="text-ink-4">
                 <tr className="border-b border-line">
@@ -271,20 +274,39 @@ export default function IntegrationStatus({
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-soft text-ink-2">
-                {evalReport.사례별.map((c) => (
-                  <tr key={c.원문}>
-                    <td className="py-1 pr-2">{c.원문}</td>
-                    <td className="py-1 pr-2 font-mono tabular-nums">
-                      {c.잡음}/{c.정답}
-                    </td>
-                    <td className="py-1 pr-2 text-critical">
-                      {c.오류 ?? (c.놓침.length ? c.놓침.join(", ") : "—")}
-                    </td>
-                    <td className="py-1 text-warn">
-                      {c.오탐.length ? c.오탐.join(", ") : "—"}
-                    </td>
-                  </tr>
-                ))}
+                {evalReport.사례별.map((c) => {
+                  const 흠 = [
+                    ...c.틀린_직무.map((x) => `직무 — ${x}`),
+                    ...c.틀린_마감.map((x) => `마감 — ${x}`),
+                  ];
+                  return (
+                    <tr key={c.원문} className="align-top">
+                      <td className="py-1 pr-2">
+                        {c.원문}
+                        {/* 무엇이 뽑혔는지 그대로 보여야 어디서 틀렸는지 안다 */}
+                        <ul className="mt-0.5 space-y-0.5 text-[10px] text-ink-4">
+                          {c.뽑은_할일.map((t) => (
+                            <li key={t}>· {t}</li>
+                          ))}
+                          {흠.map((x) => (
+                            <li key={x} className="text-warn">
+                              · {x}
+                            </li>
+                          ))}
+                        </ul>
+                      </td>
+                      <td className="py-1 pr-2 font-mono tabular-nums">
+                        {c.잡음}/{c.정답}
+                      </td>
+                      <td className="py-1 pr-2 text-critical">
+                        {c.오류 ?? (c.놓침.length ? c.놓침.join(", ") : "—")}
+                      </td>
+                      <td className="py-1 text-warn">
+                        {c.오탐.length ? c.오탐.join(", ") : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
