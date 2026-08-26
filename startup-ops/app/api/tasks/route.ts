@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { readChannelConfig, readBotToken } from "@/lib/discord";
 import { readApiKey } from "@/lib/extract";
 import { TaskPatch, getStore } from "@/lib/store";
-import { PRIORITIES, ROLES, STATUSES } from "@/lib/types";
+import { PRIORITIES, ROLES, STATUSES, StageAt } from "@/lib/types";
+import { UNASSIGNED } from "@/lib/team";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,6 +49,17 @@ export async function PATCH(request: Request) {
   if (typeof patch.assignee === "string" && patch.assignee.trim()) {
     clean.assignee = patch.assignee.trim().slice(0, 40);
   }
+
+  /*
+   * 단계 시각은 화면이 아니라 서버가 찍는다.
+   * 브라우저 시계는 틀어져 있을 수 있고, 값을 그대로 받으면 조작도 가능하다.
+   */
+  const now = new Date().toISOString();
+  const stageAt: StageAt = {};
+  if (clean.assignee && clean.assignee !== UNASSIGNED) stageAt.assigned = now;
+  if (clean.status === "진행중") stageAt.started = now;
+  if (clean.status === "완료") stageAt.done = now;
+  if (Object.keys(stageAt).length) clean.stageAt = stageAt;
 
   if (!Object.keys(clean).length) {
     return NextResponse.json({ error: "바꿀 수 있는 값이 없습니다." }, { status: 400 });

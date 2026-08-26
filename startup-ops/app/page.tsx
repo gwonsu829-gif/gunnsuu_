@@ -6,13 +6,15 @@ import IntegrationStatus, { Integrations } from "@/components/IntegrationStatus"
 import KanbanBoard from "@/components/KanbanBoard";
 import PlannerView from "@/components/PlannerView";
 import SourcePanel from "@/components/SourcePanel";
+import StageView from "@/components/StageView";
 import SummaryStrip from "@/components/SummaryStrip";
 import TaskList from "@/components/TaskList";
 import { todayISO } from "@/lib/dates";
 import { findDuplicate } from "@/lib/dedupe";
 import { buildSuggestions } from "@/lib/suggest";
+import { UNASSIGNED } from "@/lib/team";
 import { Sample, SampleId, buildSamples } from "@/lib/samples";
-import { ExtractResponse, Priority, Role, Status, Task } from "@/lib/types";
+import { ExtractResponse, Priority, Role, StageAt, Status, Task } from "@/lib/types";
 
 export default function Page() {
   // 서버·클라이언트가 같은 날짜를 쓰도록 렌더 중 한 번만 계산한다.
@@ -33,8 +35,9 @@ export default function Page() {
    * 두 화면이 서로 다른 질문에 답한다.
    * 오늘 — 마감이 가까운 순. "뭐부터 하나"
    * 인입 — 직무별로 쌓인 것. "새로 뭐가 들어왔고 분류가 맞나"
+   * 흐름 — 한 건이 어디까지 왔나. "왜 아직 안 끝났나"
    */
-  const [tab, setTab] = useState<"today" | "inbox">("inbox");
+  const [tab, setTab] = useState<"today" | "inbox" | "flow">("inbox");
 
   const seq = useRef(0);
 
@@ -135,6 +138,7 @@ export default function Page() {
             rawText: text,
             sourceLabel,
             duplicateOf: dup?.id,
+            createdAt: new Date().toISOString(),
           });
         }
         return next;
@@ -155,7 +159,31 @@ export default function Page() {
     // 대상은 현재 렌더의 tasks에서 바로 찾는다.
     // setTasks 콜백 안에서 꺼내면 그 콜백이 나중에 실행돼 아래 조건이 항상 빗나간다.
     const target = tasks.find((t) => t.id === id);
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+
+    /*
+     * 단계 시각을 화면에서도 찍는다.
+     * 자동 수집분은 서버가 다시 찍어 덮어쓰지만, 붙여넣기로 뽑은 것은
+     * 서버를 지나지 않으므로 여기서 안 찍으면 "흐름" 화면이 영영 비어 있다.
+     */
+    const now = new Date().toISOString();
+    const stamp: StageAt = {};
+    if (patch.assignee && patch.assignee !== UNASSIGNED) stamp.assigned = now;
+    if (patch.status === "진행중") stamp.started = now;
+    if (patch.status === "완료") stamp.done = now;
+
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              ...patch,
+              stageAt: Object.keys(stamp).length
+                ? { ...t.stageAt, ...stamp }
+                : t.stageAt,
+            }
+          : t,
+      ),
+    );
     // 자동 수집분은 저장소에도 반영해야 새로고침 뒤에도 남는다.
     // 화면은 이미 바뀌었으므로 실패해도 흐름을 막지 않는다.
     if (target?.origin === "server") {
@@ -222,6 +250,7 @@ export default function Page() {
         {([
           ["today", "오늘", tasks.filter((t) => t.status !== "완료").length],
           ["inbox", "인입", tasks.length],
+          ["flow", "흐름", tasks.filter((t) => t.status !== "완료").length],
         ] as const).map(([key, label, count]) => (
           <button
             key={key}
@@ -249,7 +278,15 @@ export default function Page() {
         ))}
       </nav>
 
-      {tab === "today" ? (
+      {tab === "flow" ? (
+        <StageView
+          tasks={tasks}
+          today={today}
+          suggestions={suggestions}
+          selectedId={selectedId}
+          onSelect={(id) => setSelectedId((cur) => (cur === id ? null : id))}
+        />
+      ) : tab === "today" ? (
         <PlannerView
           tasks={tasks}
           today={today}
@@ -336,6 +373,7 @@ interface ServerTask {
   rawText: string;
   createdAt: string;
   duplicateOf?: string;
+  stageAt?: StageAt;
 }
 
 function toTask(t: ServerTask): Task {
@@ -353,5 +391,7 @@ function toTask(t: ServerTask): Task {
     rawText: t.rawText,
     sourceLabel: t.sourceLabel,
     duplicateOf: t.duplicateOf,
+    stageAt: t.stageAt,
+    createdAt: t.createdAt,
   };
 }

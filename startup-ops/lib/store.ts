@@ -1,4 +1,4 @@
-import { ExtractedTask, Role, Status } from "./types";
+import { ExtractedTask, Role, StageAt, Status } from "./types";
 
 export type TaskSource = "manual" | "email" | "discord";
 
@@ -17,6 +17,8 @@ export interface StoredTask extends ExtractedTask {
   createdAt: string;
   /** 같은 건으로 보이는 기존 할일 id */
   duplicateOf?: string;
+  /** 각 단계를 언제 통과했는지 */
+  stageAt?: StageAt;
 }
 
 export interface TaskPatch {
@@ -24,6 +26,15 @@ export interface TaskPatch {
   status?: Status;
   priority?: ExtractedTask["priority"];
   assignee?: string;
+  /** 서버가 직접 찍는다. 화면에서 온 값은 쓰지 않는다. */
+  stageAt?: StageAt;
+}
+
+/** 단계 시각은 덮어쓰지 않고 쌓는다. 나중 전환이 앞선 기록을 지우면 안 된다. */
+function mergeStage(cur: StoredTask, patch: TaskPatch): StoredTask {
+  const next = { ...cur, ...patch };
+  if (patch.stageAt) next.stageAt = { ...cur.stageAt, ...patch.stageAt };
+  return next;
 }
 
 export interface Store {
@@ -71,7 +82,7 @@ const memoryStore: Store = {
   async updateTask(id, patch) {
     const cur = mem.tasks.get(id);
     if (!cur) return null;
-    const next = { ...cur, ...patch };
+    const next = mergeStage(cur, patch);
     mem.tasks.set(id, next);
     return next;
   },
@@ -158,7 +169,7 @@ function makeRedisStore(cfg: { url: string; token: string }): Store {
         | string
         | null;
       if (!raw) return null;
-      const next = { ...(JSON.parse(raw) as StoredTask), ...patch };
+      const next = mergeStage(JSON.parse(raw) as StoredTask, patch);
       await redisCommand(cfg, ["HSET", TASKS_KEY, id, JSON.stringify(next)]);
       return next;
     },

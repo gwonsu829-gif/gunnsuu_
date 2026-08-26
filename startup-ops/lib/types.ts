@@ -31,6 +31,16 @@ export interface ExtractedTask {
   status: Status;
 }
 
+/**
+ * 각 단계를 언제 통과했는지.
+ * 지나간 일은 알 수 없으므로 앞으로 생기는 전환만 쌓인다. 모르는 칸은 비워 둔다.
+ */
+export interface StageAt {
+  assigned?: string;
+  started?: string;
+  done?: string;
+}
+
 export type TaskOrigin = "local" | "server";
 
 /** 화면에서 관리하는 할일. 클라이언트에서 id와 출처 원문을 덧붙인다. */
@@ -49,6 +59,9 @@ export interface Task extends ExtractedTask {
   sourceLabel: string;
   /** 이미 등록된 할일과 같은 건으로 보이는 경우 */
   duplicateOf?: string;
+  stageAt?: StageAt;
+  /** 언제 들어왔는지. 붙여넣기로 뽑은 것은 뽑은 시각. */
+  createdAt?: string;
 }
 
 export interface ExtractResponse {
