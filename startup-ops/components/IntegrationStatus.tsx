@@ -29,6 +29,23 @@ function Lamp({ on, label, note }: { on: boolean; label: string; note?: string }
   );
 }
 
+interface EvalReport {
+  실행일: string;
+  건수: { 정답: number; 잡음: number; 놓침: number; 오탐: number };
+  재현율: string;
+  정밀도: string;
+  마감일_정확도: string;
+  직무_정확도: string;
+  사례별: {
+    원문: string;
+    정답: number;
+    잡음: number;
+    놓침: string[];
+    오탐: string[];
+    오류?: string;
+  }[];
+}
+
 export default function IntegrationStatus({
   integrations,
   syncing,
@@ -41,6 +58,7 @@ export default function IntegrationStatus({
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [digest, setDigest] = useState<string | null>(null);
+  const [evalReport, setEvalReport] = useState<EvalReport | null>(null);
 
   if (!integrations) return null;
 
@@ -68,6 +86,29 @@ export default function IntegrationStatus({
       }
     } catch {
       setTestResult("요청을 보내지 못했습니다.");
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  /**
+   * 정답지를 돌려 추출 정확도를 잰다.
+   * 만든 사람이 "잘 됩니다"라고 말하는 것과 숫자를 내놓는 것은 다르다.
+   */
+  async function runEval() {
+    setTesting(true);
+    setTestResult(null);
+    setEvalReport(null);
+    try {
+      const res = await fetch("/api/eval", { method: "POST" });
+      const data = (await res.json()) as EvalReport & { error?: string };
+      if (!res.ok) {
+        setTestResult(data.error ?? "측정 실패");
+        return;
+      }
+      setEvalReport(data);
+    } catch {
+      setTestResult("측정 요청을 보내지 못했습니다.");
     } finally {
       setTesting(false);
     }
@@ -184,6 +225,78 @@ export default function IntegrationStatus({
         </span>
       )}
 
+      {evalReport && (
+        <div className="order-last w-full rounded border border-line bg-sunk p-2.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-ink-2">
+              추출 정확도 · {evalReport.실행일} 측정
+            </span>
+            <button
+              type="button"
+              onClick={() => setEvalReport(null)}
+              className="rounded px-1.5 py-0.5 text-[11px] text-ink-4 hover:text-ink-2"
+            >
+              닫기
+            </button>
+          </div>
+
+          <div className="mb-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+            {[
+              ["재현율", evalReport.재현율, "정답 할일 중 잡아낸 비율"],
+              ["정밀도", evalReport.정밀도, "잡아낸 것 중 진짜인 비율"],
+              ["마감일", evalReport.마감일_정확도, "상대 표현을 날짜로 옳게 바꾼 비율"],
+              ["직무", evalReport.직무_정확도, "직무 분류가 맞은 비율"],
+            ].map(([label, value, note]) => (
+              <div
+                key={label}
+                title={note}
+                className="rounded border border-line bg-surface px-2 py-1.5"
+              >
+                <div className="text-[10px] text-ink-4">{label}</div>
+                <div className="font-mono text-[13px] tabular-nums text-ink">
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="thin-scroll max-h-44 overflow-auto">
+            <table className="w-full text-left text-[11px]">
+              <thead className="text-ink-4">
+                <tr className="border-b border-line">
+                  <th className="py-1 pr-2 font-medium">원문</th>
+                  <th className="py-1 pr-2 font-medium">정답</th>
+                  <th className="py-1 pr-2 font-medium">놓침</th>
+                  <th className="py-1 font-medium">잘못 만든 것</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line-soft text-ink-2">
+                {evalReport.사례별.map((c) => (
+                  <tr key={c.원문}>
+                    <td className="py-1 pr-2">{c.원문}</td>
+                    <td className="py-1 pr-2 font-mono tabular-nums">
+                      {c.잡음}/{c.정답}
+                    </td>
+                    <td className="py-1 pr-2 text-critical">
+                      {c.오류 ?? (c.놓침.length ? c.놓침.join(", ") : "—")}
+                    </td>
+                    <td className="py-1 text-warn">
+                      {c.오탐.length ? c.오탐.join(", ") : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="mt-2 text-[10.5px] leading-relaxed text-ink-4">
+            사람이 미리 정답을 적어둔 메일·디스코드 원문 {evalReport.사례별.length}건을
+            실제로 추출해 대조한 결과입니다. 마감일은 &ldquo;이번 주 금요일&rdquo; 같은 상대
+            표현을 측정일 기준으로 계산해 비교합니다.
+          </p>
+        </div>
+      )}
+
       {digest && (
         <div className="order-last w-full rounded border border-line bg-sunk p-2.5">
           <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -248,6 +361,17 @@ export default function IntegrationStatus({
             className="rounded border border-line-strong px-2 py-1 text-[11px] text-ink-2 hover:border-ink-4 hover:text-ink disabled:opacity-50"
           >
             {testing ? "보내는 중" : "메일 수신 테스트"}
+          </button>
+        )}
+        {integrations.AI && (
+          <button
+            type="button"
+            onClick={() => void runEval()}
+            disabled={testing}
+            title="정답을 미리 적어둔 원문으로 추출 정확도를 실제로 측정합니다"
+            className="rounded border border-line-strong px-2 py-1 text-[11px] text-ink-2 hover:border-ink-4 hover:text-ink disabled:opacity-50"
+          >
+            {testing ? "측정 중" : "정확도 측정"}
           </button>
         )}
         <button
