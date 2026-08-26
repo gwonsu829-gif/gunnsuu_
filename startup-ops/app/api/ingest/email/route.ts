@@ -97,6 +97,16 @@ export async function POST(request: Request) {
     receivedAt: parseDate(mail.receivedAt),
   });
 
+  /*
+   * 추출에 실패했으면 200을 주면 안 된다.
+   * 메일 전달 스크립트는 200을 보고 '할일수집' 라벨을 떼어내는데,
+   * 그러면 처리되지 않은 메일이 대기열에서 사라진다.
+   * 503으로 돌려주어 라벨이 남고 다음 실행에서 다시 오게 한다.
+   */
+  if (result.retryLater) {
+    return NextResponse.json(result, { status: 503 });
+  }
+
   return NextResponse.json(result);
 }
 

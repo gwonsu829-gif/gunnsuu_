@@ -19,6 +19,8 @@ export interface IngestResult {
   skipReason?: string;
   demo: boolean;
   demoReason?: string;
+  /** 추출이 실패해 원문을 그대로 남겨둔 경우. 부르는 쪽은 이 원문을 소비하면 안 된다. */
+  retryLater?: boolean;
 }
 
 let counter = 0;
@@ -57,6 +59,29 @@ export async function ingestText(input: IngestInput): Promise<IngestResult> {
 
   const today = todayISO();
   const outcome = await runExtraction(text, today);
+
+  /*
+   * 자동 수집에서는 폴백 결과를 저장하지 않는다.
+   *
+   * 붙여넣기 화면은 빈 화면이 나오면 안 되므로 폴백이 맞다. 그러나 수집은
+   * 다르다. 추측으로 만든 할일을 넣고 원문을 소비해 버리면, 진짜 할일은
+   * 아무도 모르는 채로 사라진다. 누락을 막으려고 만든 경로가 누락을 만드는 셈이다.
+   * 그래서 원문을 손대지 않고 남겨 다음 차례에 다시 읽히게 한다.
+   */
+  if (outcome.demo) {
+    if (input.sourceRef) {
+      await store.unmark(`${input.channel}:${input.sourceRef}`);
+    }
+    return {
+      added: 0,
+      duplicates: 0,
+      skipped: true,
+      skipReason: `AI 추출 실패 — 원문을 남겨두고 다음에 다시 시도합니다 (${outcome.demoReason ?? "원인 미상"})`,
+      demo: true,
+      demoReason: outcome.demoReason,
+      retryLater: true,
+    };
+  }
 
   const existing = await store.listTasks();
   const fresh: StoredTask[] = [];

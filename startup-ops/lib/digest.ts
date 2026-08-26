@@ -32,6 +32,12 @@ export function buildDigest(
     { label: "오늘 마감", items: pick(open, today, (d) => d === 0) },
     { label: "내일", items: pick(open, today, (d) => d === 1) },
     { label: "이번 주", items: pick(open, today, (d) => d !== null && d >= 2 && d <= 6) },
+    /*
+     * 기한이 안 잡힌 할일은 마감이 없으니 어떤 D-day 묶음에도 걸리지 않는다.
+     * 그대로 두면 알림에 한 번도 안 나오고, 화면을 안 열면 그대로 잊힌다.
+     * 누락은 바로 이 자리에서 생기므로 마지막에 따로 세워 둔다.
+     */
+    { label: "기한 미정", items: pick(open, today, (d) => d === null) },
   ].filter((g) => g.items.length > 0);
 
   const urgent = groups.reduce((n, g) => n + g.items.length, 0);

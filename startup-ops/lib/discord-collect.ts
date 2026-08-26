@@ -86,7 +86,11 @@ export async function collectDiscord(): Promise<CollectOutcome> {
         sourceRef: `${channel.id}:${newest}`,
       });
 
-      await store.setCursor(cursorKey, newest);
+      // 추출이 실패한 구간은 커서를 옮기지 않는다.
+      // 옮기면 그 대화는 다시 읽히지 않고, 거기 있던 할일은 영영 사라진다.
+      if (!result.retryLater) {
+        await store.setCursor(cursorKey, newest);
+      }
 
       reports.push({
         채널: channel.label,

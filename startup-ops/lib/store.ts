@@ -37,6 +37,11 @@ export interface Store {
   setCursor(key: string, value: string): Promise<void>;
   /** 같은 메시지를 두 번 처리하지 않도록. 처음 보는 키면 true. */
   markIfUnseen(key: string): Promise<boolean>;
+  /**
+   * 처리에 실패했을 때 표시를 도로 거둔다.
+   * 거두지 않으면 "이미 처리함"으로 남아 그 메시지는 영영 다시 읽히지 않는다.
+   */
+  unmark(key: string): Promise<void>;
 }
 
 const TASKS_KEY = "tasks:v1";
@@ -83,6 +88,9 @@ const memoryStore: Store = {
     if (mem.seen.has(key)) return false;
     mem.seen.add(key);
     return true;
+  },
+  async unmark(key) {
+    mem.seen.delete(key);
   },
 };
 
@@ -175,6 +183,9 @@ function makeRedisStore(cfg: { url: string; token: string }): Store {
         SEEN_TTL_SECONDS,
       ]);
       return res === "OK";
+    },
+    async unmark(key) {
+      await redisCommand(cfg, ["DEL", `seen:${key}`]);
     },
   };
 }
