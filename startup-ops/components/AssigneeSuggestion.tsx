@@ -24,7 +24,7 @@ export default function AssigneeSuggestionRow({
           e.stopPropagation();
           onAccept(suggestion.assignee);
         }}
-        className="inline-flex items-center gap-1 rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[11px] text-violet-700 hover:border-violet-400"
+        className="inline-flex items-center gap-1 rounded border border-accent-line bg-accent-soft px-1.5 py-0.5 text-[11px] text-accent hover:border-accent"
       >
         <span className="opacity-70">추천</span>
         <span className="font-medium">{suggestion.assignee}</span>
@@ -35,27 +35,27 @@ export default function AssigneeSuggestionRow({
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className="mt-2 rounded border border-violet-200 bg-violet-50 px-2 py-1.5"
+      className="mt-2 rounded border border-accent-line bg-accent-soft px-2 py-1.5"
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-[11px] font-semibold text-violet-800">
+        <span className="text-[11px] font-semibold text-accent">
           담당자 추천 · {suggestion.assignee}
         </span>
         <button
           type="button"
           onClick={() => onAccept(suggestion.assignee)}
-          className="rounded border border-violet-300 bg-surface px-1.5 py-0.5 text-[11px] font-medium text-violet-700 hover:border-violet-500"
+          className="rounded border border-accent-line bg-surface px-1.5 py-0.5 text-[11px] font-medium text-accent hover:border-accent"
         >
           지정
         </button>
       </div>
-      <p className="mt-1 text-[11px] leading-relaxed text-violet-700">
+      <p className="mt-1 text-[11px] leading-relaxed text-accent">
         {suggestion.reason}
       </p>
       {suggestion.examples.length > 0 && (
         <ul className="mt-0.5 space-y-0.5">
           {suggestion.examples.map((ex) => (
-            <li key={ex} className="text-[10.5px] leading-snug text-violet-600">
+            <li key={ex} className="text-[10.5px] leading-snug text-ink-3">
               · {ex}
             </li>
           ))}

@@ -76,7 +76,7 @@ export default function SourcePanel({
             {segments.before}
             <mark
               ref={markRef}
-              className="rounded bg-yellow-200 px-0.5 py-px text-ink ring-1 ring-yellow-400"
+              className="rounded bg-accent-soft px-0.5 py-px text-ink ring-1 ring-accent"
             >
               {segments.match}
             </mark>
@@ -93,7 +93,7 @@ export default function SourcePanel({
         )}
 
         {segments && (
-          <div className="pointer-events-none absolute right-3 top-3 rounded border border-yellow-300 bg-yellow-50 px-2 py-1 text-[11px] text-yellow-800">
+          <div className="pointer-events-none absolute right-3 top-3 rounded border border-accent-line bg-accent-soft px-2 py-1 text-[11px] text-accent">
             근거 문장 표시 중 · 클릭하면 편집으로 복귀
           </div>
         )}

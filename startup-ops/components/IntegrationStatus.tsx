@@ -12,20 +12,28 @@ export interface Integrations {
 
 function Lamp({ on, label, note }: { on: boolean; label: string; note?: string }) {
   return (
-    <span
-      title={note}
-      className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] ${
-        on
-          ? "border-good-line bg-good-soft text-good"
-          : "border-line bg-sunk text-ink-3"
-      }`}
-    >
+    <div className="flex items-start gap-2 rounded-md border border-line bg-surface px-2.5 py-2">
       <span
-        className={`h-1.5 w-1.5 rounded-full ${on ? "bg-good-soft0" : "bg-line-strong"}`}
+        className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+          on ? "bg-good" : "bg-line-strong"
+        }`}
       />
-      <span className="font-medium">{label}</span>
-      <span className="text-[10px] opacity-80">{on ? "연결됨" : "미설정"}</span>
-    </span>
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[12px] font-medium text-ink">{label}</span>
+          <span
+            className={`text-[10.5px] ${on ? "text-good" : "text-ink-4"}`}
+          >
+            {on ? "연결됨" : "미설정"}
+          </span>
+        </div>
+        {note && (
+          <p className="mt-0.5 truncate text-[10.5px] text-ink-4" title={note}>
+            {note}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -53,10 +61,12 @@ export default function IntegrationStatus({
   integrations,
   syncing,
   onRefresh,
+  onClose,
 }: {
   integrations: Integrations | null;
   syncing: boolean;
   onRefresh: () => void;
+  onClose: () => void;
 }) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
@@ -185,53 +195,140 @@ export default function IntegrationStatus({
     }
   }
 
-  return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface px-3 py-2">
-      <span className="text-[11px] font-semibold text-ink-2">연동 상태</span>
 
-      <Lamp on={integrations.AI} label="AI 추출" note="ANTHROPIC_API_KEY" />
-      <Lamp on={integrations.메일} label="메일 수신" note="INGEST_SECRET" />
-      <Lamp
-        on={integrations.디스코드}
-        label="디스코드"
-        note={
-          integrations.디스코드_채널.length
-            ? integrations.디스코드_채널.join(", ")
-            : "DISCORD_BOT_TOKEN + DISCORD_CHANNELS"
-        }
-      />
-      <Lamp
-        on={저장소켜짐}
-        label="저장소"
-        note={
-          저장소켜짐
-            ? "Redis에 저장됩니다"
-            : "저장소 미설정 — 자동 수집분이 유지되지 않습니다"
-        }
-      />
+  /** 도구 버튼 하나. 이름만으로는 뭐가 나오는지 모르니 한 줄 설명을 같이 붙인다. */
+  function Tool({
+    label,
+    desc,
+    busyLabel,
+    onClick,
+    disabled,
+  }: {
+    label: string;
+    desc: string;
+    busyLabel?: string;
+    onClick: () => void;
+    disabled?: boolean;
+  }) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className="flex flex-col items-start gap-0.5 rounded-md border border-line bg-surface px-3 py-2 text-left transition hover:border-accent-line hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span className="text-[12px] font-medium text-ink">
+          {disabled && busyLabel ? busyLabel : label}
+        </span>
+        <span className="text-[10.5px] leading-tight text-ink-4">{desc}</span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="drop-in rounded-lg border border-line bg-sunk p-3 shadow-card sm:p-4">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div>
+          <h2 className="text-[13px] font-semibold text-ink">설정과 도구</h2>
+          <p className="mt-0.5 text-[11px] text-ink-3">
+            평소에는 볼 일이 없습니다. 수집이 안 될 때 여기부터 확인하세요.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded-md border border-line bg-surface px-2 py-1 text-[11px] text-ink-3 hover:text-ink"
+        >
+          닫기
+        </button>
+      </div>
+
+      <p className="mb-1.5 text-[11px] font-medium text-ink-2">연동 상태</p>
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
+        <Lamp on={integrations.AI} label="AI 추출" note="ANTHROPIC_API_KEY" />
+        <Lamp on={integrations.메일} label="메일 수신" note="INGEST_SECRET" />
+        <Lamp
+          on={integrations.디스코드}
+          label="디스코드"
+          note={
+            integrations.디스코드_채널.length
+              ? integrations.디스코드_채널.join(", ")
+              : "DISCORD_BOT_TOKEN + DISCORD_CHANNELS"
+          }
+        />
+        <Lamp
+          on={저장소켜짐}
+          label="저장소"
+          note={
+            저장소켜짐
+              ? "Redis에 저장됩니다"
+              : "미설정 — 자동 수집분이 유지되지 않습니다"
+          }
+        />
+      </div>
 
       {!저장소켜짐 && (
-        <span className="rounded border border-warn-line bg-warn-soft px-2 py-1 text-[11px] text-warn">
-          저장소가 없어 자동 수집분이 유지되지 않습니다
-        </span>
+        <p className="mt-2 rounded-md border border-warn-line bg-warn-soft px-2.5 py-1.5 text-[11px] text-warn">
+          저장소가 없어 자동 수집분이 새로고침하면 사라집니다.
+        </p>
       )}
 
-      {integrations.디스코드_채널.length > 0 && (
-        <span className="text-[11px] text-ink-4">
-          {integrations.디스코드_채널.join(" · ")}
-        </span>
-      )}
+      <p className="mb-1.5 mt-4 text-[11px] font-medium text-ink-2">도구</p>
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+        <Tool
+          label="지금 새로고침"
+          busyLabel="불러오는 중"
+          desc="저장된 할일을 다시 읽습니다"
+          onClick={onRefresh}
+          disabled={syncing}
+        />
+        {integrations.디스코드 && (
+          <Tool
+            label="디스코드 지금 수집"
+            busyLabel="수집 중"
+            desc="크론을 기다리지 않고 채널을 훑습니다"
+            onClick={() => void collectDiscord()}
+            disabled={testing}
+          />
+        )}
+        {integrations.메일 && (
+          <Tool
+            label="아침 요약 보기"
+            desc="내일 아침에 나갈 내용을 미리 봅니다"
+            onClick={() => void runDigest(false)}
+            disabled={testing}
+          />
+        )}
+        {integrations.메일 && (
+          <Tool
+            label="메일 수신 테스트"
+            busyLabel="보내는 중"
+            desc="메일 1통이 들어온 상황을 흉내냅니다"
+            onClick={() => void runTest()}
+            disabled={testing}
+          />
+        )}
+        {integrations.AI && (
+          <Tool
+            label="정확도 측정"
+            busyLabel="측정 중"
+            desc="정답지를 돌려 추출 정확도를 잽니다"
+            onClick={() => void runEval()}
+            disabled={testing}
+          />
+        )}
+      </div>
 
       {testResult && (
-        <span className="max-w-full rounded border border-line bg-sunk px-2 py-1 text-[11px] text-ink-2">
+        <p className="mt-2.5 rounded-md border border-line bg-surface px-2.5 py-1.5 text-[11.5px] text-ink-2">
           {testResult}
-        </span>
+        </p>
       )}
 
       {evalReport && (
-        <div className="order-last w-full rounded border border-line bg-sunk p-2.5">
+        <div className="mt-2.5 rounded-md border border-line bg-surface p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold text-ink-2">
+            <span className="text-[11.5px] font-semibold text-ink">
               추출 정확도 · {evalReport.실행일} 측정
             </span>
             <button
@@ -253,7 +350,7 @@ export default function IntegrationStatus({
               <div
                 key={label}
                 title={note}
-                className="rounded border border-line bg-surface px-2 py-1.5"
+                className="rounded-md border border-line bg-sunk px-2 py-1.5"
               >
                 <div className="text-[10px] text-ink-4">{label}</div>
                 <div className="font-mono text-[13px] tabular-nums text-ink">
@@ -264,7 +361,7 @@ export default function IntegrationStatus({
           </div>
 
           <div className="thin-scroll max-h-72 overflow-auto">
-            <table className="w-full text-left text-[11px]">
+            <table className="w-full min-w-[520px] text-left text-[11px]">
               <thead className="text-ink-4">
                 <tr className="border-b border-line">
                   <th className="py-1 pr-2 font-medium">원문</th>
@@ -320,9 +417,9 @@ export default function IntegrationStatus({
       )}
 
       {digest && (
-        <div className="order-last w-full rounded border border-line bg-sunk p-2.5">
+        <div className="mt-2.5 rounded-md border border-line bg-surface p-3">
           <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold text-ink-2">
+            <span className="text-[11.5px] font-semibold text-ink">
               아침에 나갈 내용
             </span>
             <div className="flex items-center gap-1">
@@ -331,7 +428,7 @@ export default function IntegrationStatus({
                   type="button"
                   onClick={() => void runDigest(true)}
                   disabled={testing}
-                  className="rounded border border-line-strong bg-surface px-1.5 py-0.5 text-[11px] text-ink-2 hover:border-ink-4 disabled:opacity-50"
+                  className="rounded-md border border-line-strong bg-surface px-2 py-0.5 text-[11px] text-ink-2 hover:border-ink-4 disabled:opacity-50"
                 >
                   지금 디스코드로 보내기
                 </button>
@@ -350,61 +447,6 @@ export default function IntegrationStatus({
           </pre>
         </div>
       )}
-
-      <div className="ml-auto flex items-center gap-1.5">
-        {integrations.메일 && (
-          <button
-            type="button"
-            onClick={() => void runDigest(false)}
-            disabled={testing}
-            title="아침에 나갈 요약을 지금 확인합니다"
-            className="rounded border border-line-strong px-2 py-1 text-[11px] text-ink-2 hover:border-ink-4 hover:text-ink disabled:opacity-50"
-          >
-            아침 요약 보기
-          </button>
-        )}
-        {integrations.디스코드 && (
-          <button
-            type="button"
-            onClick={() => void collectDiscord()}
-            disabled={testing}
-            title="크론을 기다리지 않고 지금 채널을 훑습니다"
-            className="rounded border border-line-strong px-2 py-1 text-[11px] text-ink-2 hover:border-ink-4 hover:text-ink disabled:opacity-50"
-          >
-            {testing ? "수집 중" : "디스코드 지금 수집"}
-          </button>
-        )}
-        {integrations.메일 && (
-          <button
-            type="button"
-            onClick={() => void runTest()}
-            disabled={testing}
-            title="메일이 들어온 상황을 흉내내 수집 경로 전체를 확인합니다"
-            className="rounded border border-line-strong px-2 py-1 text-[11px] text-ink-2 hover:border-ink-4 hover:text-ink disabled:opacity-50"
-          >
-            {testing ? "보내는 중" : "메일 수신 테스트"}
-          </button>
-        )}
-        {integrations.AI && (
-          <button
-            type="button"
-            onClick={() => void runEval()}
-            disabled={testing}
-            title="정답을 미리 적어둔 원문으로 추출 정확도를 실제로 측정합니다"
-            className="rounded border border-line-strong px-2 py-1 text-[11px] text-ink-2 hover:border-ink-4 hover:text-ink disabled:opacity-50"
-          >
-            {testing ? "측정 중" : "정확도 측정"}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={syncing}
-          className="rounded border border-line-strong px-2 py-1 text-[11px] text-ink-2 hover:border-ink-4 hover:text-ink disabled:opacity-50"
-        >
-          {syncing ? "불러오는 중" : "지금 새로고침"}
-        </button>
-      </div>
     </div>
   );
 }

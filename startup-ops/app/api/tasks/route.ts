@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { readChannelConfig, readBotToken } from "@/lib/discord";
 import { readApiKey } from "@/lib/extract";
+import { readSlot } from "@/lib/slot";
 import { TaskPatch, getStore } from "@/lib/store";
 import { PRIORITIES, ROLES, STATUSES, StageAt } from "@/lib/types";
 import { UNASSIGNED } from "@/lib/team";
@@ -48,6 +49,17 @@ export async function PATCH(request: Request) {
   if (patch.priority && (PRIORITIES as readonly string[]).includes(patch.priority)) clean.priority = patch.priority;
   if (typeof patch.assignee === "string" && patch.assignee.trim()) {
     clean.assignee = patch.assignee.trim().slice(0, 40);
+  }
+  /*
+   * 잡아둔 시간. null은 "해제"라는 뜻이라 그대로 통과시킨다.
+   * 값이 왔는데 말이 안 되면 400으로 막지 않고 이 필드만 버린다 —
+   * 시간 하나 때문에 같이 온 담당자·상태 변경까지 되돌릴 이유가 없다.
+   */
+  if (patch.slot === null) {
+    clean.slot = null;
+  } else if (patch.slot) {
+    const s = readSlot(patch.slot);
+    if (s) clean.slot = s;
   }
 
   /*

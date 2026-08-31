@@ -55,7 +55,7 @@ export default function KanbanBoard({
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-px bg-line">
+            <div className="grid grid-cols-1 gap-px bg-line sm:grid-cols-3">
               {STATUSES.map((status) => {
                 const cellKey = `${role}:${status}`;
                 const cellTasks = laneTasks.filter((t) => t.status === status);

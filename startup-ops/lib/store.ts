@@ -1,4 +1,4 @@
-import { ExtractedTask, Role, StageAt, Status } from "./types";
+import { ExtractedTask, Role, Slot, StageAt, Status } from "./types";
 
 export type TaskSource = "manual" | "email" | "discord";
 
@@ -19,6 +19,16 @@ export interface StoredTask extends ExtractedTask {
   duplicateOf?: string;
   /** 각 단계를 언제 통과했는지 */
   stageAt?: StageAt;
+  /** 손대기로 잡아둔 시간. 없으면 아직 안 잡은 일. */
+  slot?: Slot;
+  /**
+   * 사람이 덮어쓴 항목.
+   *
+   * AI가 정한 값을 사람이 얼마나 고치는지가 추출 품질의 유일한 실사용 신호다.
+   * 고친 뒤 값만 남기면 "원래 그렇게 나왔는지" 알 수 없어 이 표시를 따로 둔다.
+   * 되돌려도 지우지 않는다 — 손이 갔다는 사실 자체가 신호다.
+   */
+  edited?: { role?: true; priority?: true; assignee?: true };
 }
 
 export interface TaskPatch {
@@ -28,12 +38,30 @@ export interface TaskPatch {
   assignee?: string;
   /** 서버가 직접 찍는다. 화면에서 온 값은 쓰지 않는다. */
   stageAt?: StageAt;
+  /** 잡아둔 시간. null을 보내면 해제한다. */
+  slot?: Slot | null;
 }
 
 /** 단계 시각은 덮어쓰지 않고 쌓는다. 나중 전환이 앞선 기록을 지우면 안 된다. */
 function mergeStage(cur: StoredTask, patch: TaskPatch): StoredTask {
-  const next = { ...cur, ...patch };
+  const next = { ...cur, ...patch } as StoredTask;
   if (patch.stageAt) next.stageAt = { ...cur.stageAt, ...patch.stageAt };
+  /*
+   * 시간 해제는 null로 온다. 그대로 두면 slot:null이 저장돼
+   * "잡힌 시간이 있는데 값이 비어 있음"이 되므로 필드째 지운다.
+   */
+  if (patch.slot === null) delete next.slot;
+
+  /*
+   * 사람이 고친 항목을 표시한다. 값이 실제로 달라졌을 때만 — 같은 값을
+   * 다시 고른 것까지 세면 "고친 비율"이 부풀어 품질 신호가 못 된다.
+   */
+  const edited = { ...cur.edited };
+  if (patch.role && patch.role !== cur.role) edited.role = true;
+  if (patch.priority && patch.priority !== cur.priority) edited.priority = true;
+  if (patch.assignee && patch.assignee !== cur.assignee) edited.assignee = true;
+  if (Object.keys(edited).length) next.edited = edited;
+
   return next;
 }
 
@@ -53,9 +81,15 @@ export interface Store {
    * 거두지 않으면 "이미 처리함"으로 남아 그 메시지는 영영 다시 읽히지 않는다.
    */
   unmark(key: string): Promise<void>;
+  /** 화면 오른쪽 메모. 없으면 빈 문자열. */
+  getNotes(): Promise<string>;
+  setNotes(text: string): Promise<void>;
 }
 
 const TASKS_KEY = "tasks:v1";
+const NOTES_KEY = "notes:v1";
+/** 메모는 메모지지 문서가 아니다. 길이를 막아 저장소가 부풀지 않게 한다. */
+export const NOTES_MAX = 4000;
 const SEEN_TTL_SECONDS = 60 * 60 * 24 * 14;
 
 /* ---------------- 메모리 (설정이 없을 때의 강등 경로) ---------------- */
@@ -69,6 +103,7 @@ const mem = {
   tasks: new Map<string, StoredTask>(),
   cursors: new Map<string, string>(),
   seen: new Set<string>(),
+  notes: "",
 };
 
 const memoryStore: Store = {
@@ -102,6 +137,12 @@ const memoryStore: Store = {
   },
   async unmark(key) {
     mem.seen.delete(key);
+  },
+  async getNotes() {
+    return mem.notes;
+  },
+  async setNotes(text) {
+    mem.notes = text;
   },
 };
 
@@ -197,6 +238,13 @@ function makeRedisStore(cfg: { url: string; token: string }): Store {
     },
     async unmark(key) {
       await redisCommand(cfg, ["DEL", `seen:${key}`]);
+    },
+    async getNotes() {
+      const v = (await redisCommand(cfg, ["GET", NOTES_KEY])) as string | null;
+      return v ?? "";
+    },
+    async setNotes(text) {
+      await redisCommand(cfg, ["SET", NOTES_KEY, text]);
     },
   };
 }

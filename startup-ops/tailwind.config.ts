@@ -1,8 +1,12 @@
 import type { Config } from "tailwindcss";
 
 /**
- * 스톡 회색을 그대로 쓰지 않고 액센트(잉크블루) 쪽으로 살짝 기운 중성색을 쓴다.
- * 순수 회색은 고른 티가 안 나고, 화면이 밋밋해 보이는 원인이 된다.
+ * 클로드(Anthropic) 팔레트.
+ * 회색 대신 따뜻한 크림 중성색을 쓴다 — 순수 회색은 화면이 차갑고 밋밋해 보인다.
+ *
+ * 액센트는 브랜드 오렌지 #d97757을 그대로 쓰지 않고 한 단계 어둡게(#c0603c) 쓴다.
+ * 원색은 흰 글자 대비가 3:1 근처라 버튼 배경으로 쓰면 글자가 안 읽힌다.
+ * 밝은 원색은 점·마크처럼 글자가 안 올라가는 곳(accent-bright)에만.
  */
 const config: Config = {
   content: [
@@ -13,39 +17,40 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ground: "#f4f6f8",
+        ground: "#faf9f5",
         surface: "#ffffff",
-        sunk: "#f7f9fb",
+        sunk: "#f5f4ed",
         line: {
-          DEFAULT: "#e2e7ec",
-          soft: "#eef1f5",
-          strong: "#cbd3dc",
+          DEFAULT: "#e6e4da",
+          soft: "#efede4",
+          strong: "#d3d0c2",
         },
         ink: {
-          DEFAULT: "#13171d",
-          2: "#3b434e",
-          3: "#67707c",
-          4: "#98a1ad",
+          DEFAULT: "#141413",
+          2: "#3f3e3a",
+          3: "#6e6c64",
+          4: "#9d9a8f",
         },
         accent: {
-          DEFAULT: "#1b4d7e",
-          soft: "#eaf1f8",
-          line: "#c2d6e8",
+          DEFAULT: "#c0603c",
+          bright: "#d97757",
+          soft: "#f9efe9",
+          line: "#eed8cb",
         },
         critical: {
-          DEFAULT: "#a72833",
-          soft: "#fdeef0",
-          line: "#f2ccd1",
+          DEFAULT: "#a33a30",
+          soft: "#fbeeec",
+          line: "#f0d5d0",
         },
         warn: {
-          DEFAULT: "#8d5c0c",
-          soft: "#fdf3e3",
-          line: "#eeddbd",
+          DEFAULT: "#8a5a12",
+          soft: "#fbf3e4",
+          line: "#eeddbe",
         },
         good: {
-          DEFAULT: "#176a47",
-          soft: "#e9f5ef",
-          line: "#c2e0d2",
+          DEFAULT: "#556b3e",
+          soft: "#f0f3ea",
+          line: "#dae0cc",
         },
       },
       fontFamily: {
@@ -61,13 +66,15 @@ const config: Config = {
         mono: ["IBM Plex Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       boxShadow: {
-        card: "0 1px 2px rgba(19, 23, 29, .05)",
-        raised: "0 1px 3px rgba(19, 23, 29, .07), 0 1px 2px rgba(19, 23, 29, .04)",
+        card: "0 1px 2px rgba(20, 20, 19, .04)",
+        raised: "0 2px 6px rgba(20, 20, 19, .06), 0 1px 2px rgba(20, 20, 19, .04)",
+        pop: "0 8px 24px rgba(20, 20, 19, .10), 0 2px 6px rgba(20, 20, 19, .06)",
       },
       borderRadius: {
-        DEFAULT: "6px",
-        md: "7px",
-        lg: "9px",
+        DEFAULT: "8px",
+        md: "10px",
+        lg: "12px",
+        xl: "16px",
       },
     },
   },

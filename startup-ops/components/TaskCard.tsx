@@ -116,8 +116,8 @@ export default function TaskCard({
 /** 자동 수집분과 직접 붙여넣은 것을 한눈에 구분한다. */
 const CHANNEL_STYLE: Record<Task["channel"], { label: string; badge: string }> = {
   manual: { label: "직접 입력", badge: "border-line bg-sunk text-ink-3" },
-  email: { label: "메일", badge: "border-sky-200 bg-sky-50 text-sky-700" },
-  discord: { label: "디스코드", badge: "border-indigo-200 bg-indigo-50 text-indigo-700" },
+  email: { label: "메일", badge: "border-[#d7e3ee] bg-[#eef3f8] text-[#375f80]" },
+  discord: { label: "디스코드", badge: "border-[#dcdaeb] bg-[#f0eff7] text-[#414070]" },
 };
 
 function truncate(s: string, n: number) {

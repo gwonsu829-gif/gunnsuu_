@@ -22,6 +22,11 @@ body {
   font-feature-settings: "tnum" 0;
 }
 
+::selection {
+  background-color: theme("colors.accent.soft");
+  color: theme("colors.ink.DEFAULT");
+}
+
 /* 숫자가 세로로 줄맞춤되어야 하는 곳 */
 .num {
   font-variant-numeric: tabular-nums;
@@ -30,7 +35,7 @@ body {
 h1,
 h2,
 h3 {
-  letter-spacing: -0.011em;
+  letter-spacing: -0.012em;
   text-wrap: balance;
 }
 
@@ -47,7 +52,36 @@ h3 {
   background-color: transparent;
 }
 
+/* 탭·칩 줄이 모바일에서 가로로 밀릴 때 스크롤바가 레이아웃을 흔들지 않게 */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 :focus-visible {
   outline: 2px solid theme("colors.accent.DEFAULT");
   outline-offset: 1px;
+}
+
+/* 도구 패널이 펼쳐질 때. 갑자기 나타나면 어디서 나온 건지 놓친다 */
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.drop-in {
+  animation: drop-in 0.14s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drop-in {
+    animation: none;
+  }
 }

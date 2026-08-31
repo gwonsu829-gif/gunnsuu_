@@ -41,6 +41,21 @@ export interface StageAt {
   done?: string;
 }
 
+/**
+ * 실제로 손대기로 잡아둔 시간.
+ *
+ * 마감(dueDate)과 다르다. 마감은 "언제까지"고 이건 "언제 한다"다.
+ * 둘을 한 필드로 합치면 "기한은 코앞인데 아직 시간을 못 잡은 일"이
+ * 안 보이게 되는데, 주 뷰는 정확히 그 구분 위에 서 있다.
+ * 시간을 안 잡은 일은 slot이 없고, 격자가 아니라 왼쪽 목록에 남는다.
+ */
+export interface Slot {
+  /** ISO 8601 (UTC) */
+  start: string;
+  /** ISO 8601 (UTC). 항상 start보다 뒤. */
+  end: string;
+}
+
 export type TaskOrigin = "local" | "server";
 
 /** 화면에서 관리하는 할일. 클라이언트에서 id와 출처 원문을 덧붙인다. */
@@ -62,6 +77,10 @@ export interface Task extends ExtractedTask {
   stageAt?: StageAt;
   /** 언제 들어왔는지. 붙여넣기로 뽑은 것은 뽑은 시각. */
   createdAt?: string;
+  /** 손대기로 잡아둔 시간. 없으면 아직 안 잡은 일. */
+  slot?: Slot;
+  /** 사람이 덮어쓴 항목. AI 결과를 얼마나 고치는지가 품질 신호다. */
+  edited?: { role?: true; priority?: true; assignee?: true };
 }
 
 export interface ExtractResponse {

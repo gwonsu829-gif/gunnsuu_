@@ -61,7 +61,7 @@ export default function TaskList({
               아직 추출된 할일이 없습니다
             </p>
             <p className="text-[12px] text-ink-4">
-              왼쪽에 원문을 넣고 &lsquo;AI로 할일 추출하기&rsquo;를 눌러보세요.
+              원문을 넣고 &lsquo;AI로 할일 추출하기&rsquo;를 눌러보세요.
             </p>
           </div>
         ) : (

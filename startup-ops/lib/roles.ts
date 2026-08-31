@@ -10,36 +10,36 @@ export const ROLE_STYLE: Record<Role, { badge: string; dot: string }> = {
     dot: "bg-ink-3",
   },
   CS: {
-    badge: "bg-[#f0f6f9] text-[#2c556d] border-[#d1e1ea]",
-    dot: "bg-[#4187af]",
+    badge: "bg-[#eef3f8] text-[#375f80] border-[#d7e3ee]",
+    dot: "bg-[#5a86ad]",
   },
   Sales: {
-    badge: "bg-[#f0f9f5] text-[#2c6d4f] border-[#d1eadf]",
-    dot: "bg-[#41af7c]",
+    badge: "bg-[#eff3ea] text-[#4b6236] border-[#dce5cf]",
+    dot: "bg-[#788c5d]",
   },
   개발: {
-    badge: "bg-[#f1f0f9] text-[#322c6d] border-[#d3d1ea]",
-    dot: "bg-[#4a41af]",
+    badge: "bg-[#f0eff7] text-[#414070] border-[#dcdaeb]",
+    dot: "bg-[#6b69a8]",
   },
   마케팅: {
-    badge: "bg-[#f9f6f0] text-[#6d532c] border-[#eae0d1]",
-    dot: "bg-[#af8341]",
+    badge: "bg-[#fbf0e9] text-[#8a4b28] border-[#f0dcd0]",
+    dot: "bg-[#d97757]",
   },
   CX: {
-    badge: "bg-[#f9f0f3] text-[#6d2c3e] border-[#ead1d8]",
-    dot: "bg-[#af415e]",
+    badge: "bg-[#fbeef1] text-[#7d3348] border-[#f0d5dc]",
+    dot: "bg-[#b05a74]",
   },
   "R&D": {
-    badge: "bg-[#f6f0f9] text-[#572c6d] border-[#e2d1ea]",
-    dot: "bg-[#8a41af]",
+    badge: "bg-[#f5eef7] text-[#653f76] border-[#e7d7ec]",
+    dot: "bg-[#96609f]",
   },
   지원사업: {
-    badge: "bg-[#f0f9f9] text-[#2c6d6a] border-[#d1eaea]",
-    dot: "bg-[#41afab]",
+    badge: "bg-[#ebf3f2] text-[#2f6360] border-[#d3e5e2]",
+    dot: "bg-[#4f918c]",
   },
   경영지원: {
-    badge: "bg-[#f9f4f0] text-[#6d442c] border-[#eadad1]",
-    dot: "bg-[#af6941]",
+    badge: "bg-[#f6f1ea] text-[#6b4c2c] border-[#e8dcc9]",
+    dot: "bg-[#a37a4a]",
   },
 };
 

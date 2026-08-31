@@ -14,7 +14,7 @@ import { findDuplicate } from "@/lib/dedupe";
 import { buildSuggestions } from "@/lib/suggest";
 import { UNASSIGNED } from "@/lib/team";
 import { Sample, SampleId, buildSamples } from "@/lib/samples";
-import { ExtractResponse, Priority, Role, StageAt, Status, Task } from "@/lib/types";
+import { ExtractResponse, Priority, Role, Slot, StageAt, Status, Task } from "@/lib/types";
 
 export default function Page() {
   // 서버·클라이언트가 같은 날짜를 쓰도록 렌더 중 한 번만 계산한다.
@@ -37,7 +37,9 @@ export default function Page() {
    * 인입 — 직무별로 쌓인 것. "새로 뭐가 들어왔고 분류가 맞나"
    * 흐름 — 한 건이 어디까지 왔나. "왜 아직 안 끝났나"
    */
-  const [tab, setTab] = useState<"today" | "inbox" | "flow">("inbox");
+  const [tab, setTab] = useState<"today" | "inbox" | "flow">("today");
+  /** 진단 도구는 평소에 접어둔다. 매일 쓰는 화면이 관리자 버튼에 밀리면 안 된다. */
+  const [toolsOpen, setToolsOpen] = useState(false);
 
   const seq = useRef(0);
 
@@ -195,6 +197,28 @@ export default function Page() {
     }
   }
 
+  /**
+   * 시간 잡기·비우기.
+   *
+   * updateTask를 못 쓰는 이유: 그쪽 patch가 Partial<Task>라 slot에 null을 넣을 수 없다.
+   * 화면에서는 필드를 지우고(undefined), 서버에는 "해제"를 뜻하는 null을 보낸다.
+   */
+  function setSlot(id: string, slot: Slot | null) {
+    const target = tasks.find((t) => t.id === id);
+
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, slot: slot ?? undefined } : t)),
+    );
+
+    if (target?.origin === "server") {
+      void fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, patch: { slot } }),
+      }).catch(() => undefined);
+    }
+  }
+
   function selectTask(id: string) {
     setSelectedId((cur) => (cur === id ? null : id));
     const task = tasks.find((t) => t.id === id);
@@ -207,149 +231,308 @@ export default function Page() {
     }
   }
 
+  /**
+   * 탭 이름을 "오늘/인입/흐름"에서 질문형으로 바꿨다.
+   * 대표님이 화면을 열고 "뭘 봐야 하는지 모르겠다"고 한 게 이 화면의 진짜 문제였고,
+   * 명사 세 개는 그 질문에 답하지 못한다. 라벨이 답을 알려주게 한다.
+   */
+  const TABS = [
+    {
+      key: "today" as const,
+      label: "오늘 할 일",
+      question: "뭐부터 하면 되나요?",
+      count: tasks.filter((t) => t.status !== "완료").length,
+    },
+    {
+      key: "inbox" as const,
+      label: "새로 들어온 것",
+      question: "뭐가 들어왔고 분류가 맞나요?",
+      count: tasks.length,
+    },
+    {
+      key: "flow" as const,
+      label: "진행 상황",
+      question: "왜 아직 안 끝났나요?",
+      count: tasks.filter((t) => t.status !== "완료").length,
+    },
+  ];
+
+  const 연결수 = integrations
+    ? [
+        integrations.AI,
+        integrations.메일,
+        integrations.디스코드,
+        integrations.저장소 === "redis",
+      ].filter(Boolean).length
+    : 0;
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-[1440px] flex-col gap-4 px-5 py-6">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-baseline gap-2.5">
-          <h1 className="text-[17px] font-bold tracking-[-0.015em] text-ink">
-            업무 자동 분류 대시보드
-          </h1>
-          <p className="text-[12.5px] text-ink-3">
-            흩어진 원문에서 할일을 추출해 직무별로 모읍니다
-          </p>
+    <main className="mx-auto flex min-h-screen max-w-[1440px] flex-col gap-3 px-3 py-4 sm:gap-4 sm:px-5 sm:py-6">
+      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            aria-hidden
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent text-[13px] font-bold text-white"
+          >
+            할
+          </span>
+          <div className="min-w-0">
+            <h1 className="truncate text-[16px] font-bold tracking-[-0.015em] text-ink sm:text-[17px]">
+              업무 자동 분류 대시보드
+            </h1>
+            <p className="hidden text-[12px] text-ink-3 sm:block">
+              메일과 디스코드에 흩어진 할일을 한곳에 모읍니다
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-1.5">
           {demo && (
             <span
               title={demoReason ?? undefined}
-              className="flex items-center gap-1.5 rounded border border-warn-line bg-warn-soft px-2 py-1 text-[11px] text-warn"
+              className="rounded-md border border-warn-line bg-warn-soft px-2 py-1 text-[11px] font-semibold text-warn"
             >
-              <span className="font-semibold">데모 모드</span>
-              {demoReason && (
-                <span className="max-w-[280px] truncate border-l border-warn-line pl-1.5 font-normal text-warn">
-                  {demoReason}
-                </span>
-              )}
+              데모 모드
             </span>
           )}
-          <span className="num rounded border border-line bg-surface px-2 py-1 text-[11px] text-ink-3">
+          <span className="num hidden rounded-md border border-line bg-surface px-2 py-1 text-[11px] text-ink-3 sm:inline">
             기준일 {today}
           </span>
+          <button
+            type="button"
+            onClick={() => setToolsOpen((v) => !v)}
+            aria-expanded={toolsOpen}
+            className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11.5px] font-medium transition ${
+              toolsOpen
+                ? "border-accent bg-accent-soft text-accent"
+                : "border-line bg-surface text-ink-2 hover:border-line-strong"
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                연결수 === 4 ? "bg-good" : "bg-warn"
+              }`}
+            />
+            설정·도구
+            <span className="num text-ink-4">{연결수}/4</span>
+          </button>
         </div>
       </header>
 
-      <SummaryStrip tasks={tasks} today={today} />
+      {toolsOpen && (
+        <IntegrationStatus
+          integrations={integrations}
+          syncing={syncing}
+          onRefresh={() => void loadServerTasks()}
+          onClose={() => setToolsOpen(false)}
+        />
+      )}
 
-      <IntegrationStatus
-        integrations={integrations}
-        syncing={syncing}
-        onRefresh={() => void loadServerTasks()}
-      />
+      {/* inbox는 예외 — 0건이어도 원문을 넣는 화면이다. 여기까지 덮으면 추출로 갈 길이 막힌다. */}
+      {tasks.length === 0 && tab !== "inbox" ? (
+        /*
+         * 빈 화면에 지표 0 여섯 개와 빈 상자를 띄우면 처음 온 사람은
+         * 고장난 화면으로 읽는다. 할일이 하나도 없을 때는 지표·탭을 전부 감추고
+         * 다음에 누를 것 하나만 남긴다.
+         */
+        <section className="rounded-lg border border-line bg-surface p-5 shadow-card sm:p-8">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent">
+            시작하기
+          </p>
+          <h2 className="mt-1.5 text-[19px] font-bold text-ink sm:text-[22px]">
+            아직 모인 할일이 없습니다
+          </h2>
+          <p className="mt-2 max-w-[62ch] text-[13px] leading-relaxed text-ink-3">
+            메일과 디스코드는 자동으로 수집됩니다. 지금 어떻게 동작하는지 보려면
+            아래 예시 원문 중 하나를 골라 눌러보세요. AI가 할일을 뽑아 직무별로
+            나누고 담당자까지 제안합니다.
+          </p>
 
-      <nav className="flex items-center gap-0.5 border-b border-line">
-        {([
-          ["today", "오늘", tasks.filter((t) => t.status !== "완료").length],
-          ["inbox", "인입", tasks.length],
-          ["flow", "흐름", tasks.filter((t) => t.status !== "완료").length],
-        ] as const).map(([key, label, count]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setTab(key)}
-            aria-current={tab === key}
-            className={`-mb-px flex items-center gap-1.5 border-b-2 px-3.5 py-2.5 text-[13.5px] font-medium transition
-              ${
-                tab === key
-                  ? "border-accent text-accent"
-                  : "border-transparent text-ink-3 hover:text-ink-2"
-              }`}
+          <div className="mt-5 grid gap-2 sm:grid-cols-3">
+            {samples.map((sample, i) => (
+              <button
+                key={sample.id}
+                type="button"
+                onClick={() => {
+                  injectSample(sample);
+                  setTab("inbox");
+                }}
+                className="group flex flex-col items-start gap-1 rounded-lg border border-line bg-sunk px-3.5 py-3 text-left transition hover:border-accent hover:bg-accent-soft"
+              >
+                <span className="num flex h-5 w-5 items-center justify-center rounded-md bg-surface text-[11px] font-bold text-ink-3 group-hover:bg-accent group-hover:text-white">
+                  {i + 1}
+                </span>
+                <span className="mt-1 text-[13px] font-semibold text-ink">
+                  {sample.label}
+                </span>
+                <span className="text-[11.5px] leading-snug text-ink-3">
+                  {sample.hint}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line-soft pt-4">
+            <button
+              type="button"
+              onClick={() => setTab("inbox")}
+              className="rounded-md border border-line-strong bg-surface px-3 py-1.5 text-[12px] font-medium text-ink-2 hover:border-ink-4 hover:text-ink"
+            >
+              직접 붙여넣기
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadServerTasks()}
+              disabled={syncing}
+              className="rounded-md border border-line-strong bg-surface px-3 py-1.5 text-[12px] font-medium text-ink-2 hover:border-ink-4 hover:text-ink disabled:opacity-50"
+            >
+              {syncing ? "불러오는 중" : "수집된 것 다시 확인"}
+            </button>
+            <span className="text-[11px] text-ink-4">
+              30초마다 자동으로 다시 확인합니다
+            </span>
+          </div>
+        </section>
+      ) : (
+        <>
+          {/*
+            '오늘'에서는 숨긴다. 그 탭이 같은 숫자를 요약 문장으로 다시 말하기 때문에
+            둘을 함께 두면 어느 쪽을 봐야 하는지가 또 흐려진다.
+          */}
+          {tasks.length > 0 && tab !== "today" && (
+            <SummaryStrip tasks={tasks} today={today} />
+          )}
+
+          <nav
+            aria-label="화면 전환"
+            className="no-scrollbar -mx-3 flex gap-2 overflow-x-auto px-3 sm:mx-0 sm:px-0"
           >
-            {label}
-            {count > 0 && (
-              <span
-                className={`num rounded px-1.5 py-0.5 text-[11px] ${
-                  tab === key ? "bg-accent-soft text-accent" : "bg-sunk text-ink-3"
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                aria-current={tab === t.key}
+                aria-label={`${t.label} — ${t.question}`}
+                className={`flex min-w-[152px] shrink-0 flex-col items-start gap-0.5 rounded-lg border px-3.5 py-2.5 text-left transition sm:flex-1 ${
+                  tab === t.key
+                    ? "border-accent bg-accent-soft shadow-card"
+                    : "border-line bg-surface hover:border-line-strong"
                 }`}
               >
-                {count}
-              </span>
-            )}
-          </button>
-        ))}
-      </nav>
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className={`text-[13.5px] font-semibold ${
+                      tab === t.key ? "text-accent" : "text-ink"
+                    }`}
+                  >
+                    {t.label}
+                  </span>
+                  {t.count > 0 && (
+                    <span
+                      className={`num rounded px-1.5 py-0.5 text-[11px] font-medium ${
+                        tab === t.key
+                          ? "bg-accent text-white"
+                          : "bg-sunk text-ink-3"
+                      }`}
+                    >
+                      {t.count}
+                    </span>
+                  )}
+                </span>
+                <span
+                  className={`text-[11px] ${
+                    tab === t.key ? "text-accent" : "text-ink-4"
+                  }`}
+                >
+                  {t.question}
+                </span>
+              </button>
+            ))}
+          </nav>
 
-      {tab === "flow" ? (
-        <StageView
-          tasks={tasks}
-          today={today}
-          suggestions={suggestions}
-          selectedId={selectedId}
-          onSelect={(id) => setSelectedId((cur) => (cur === id ? null : id))}
-        />
-      ) : tab === "today" ? (
-        <PlannerView
-          tasks={tasks}
-          today={today}
-          selectedId={selectedId}
-          onSelect={(id) => {
-            setSelectedId((cur) => (cur === id ? null : id));
-          }}
-          onStatusChange={(id, status) => updateTask(id, { status })}
-          suggestions={suggestions}
-          onAssigneeChange={(id, assignee) => updateTask(id, { assignee })}
-        />
-      ) : (
-      <>
-      <div className="grid gap-3 lg:min-h-[560px] lg:grid-cols-2">
-        <SourcePanel
-          value={text}
-          onChange={handleTextChange}
-          samples={samples}
-          activeSampleId={activeSampleId}
-          onInjectSample={injectSample}
-          onExtract={extract}
-          loading={loading}
-          highlight={highlight}
-          onExitHighlight={() => setSelectedId(null)}
-          error={error}
-        />
-        <TaskList
-          tasks={tasks}
-          selectedId={selectedId}
-          today={today}
-          onSelect={selectTask}
-          onPriorityChange={(id, priority: Priority) => updateTask(id, { priority })}
-          onAssigneeChange={(id, assignee) => updateTask(id, { assignee })}
-          suggestions={suggestions}
-          onClear={() => {
-            if (tasks.some((t) => t.origin === "server")) {
-              void fetch("/api/tasks", { method: "DELETE" }).catch(() => undefined);
-            }
-            setTasks([]);
-            setSelectedId(null);
-          }}
-        />
-      </div>
+          {tab === "flow" ? (
+            <StageView
+              tasks={tasks}
+              today={today}
+              suggestions={suggestions}
+              selectedId={selectedId}
+              onSelect={(id) => setSelectedId((cur) => (cur === id ? null : id))}
+            />
+          ) : tab === "today" ? (
+            <PlannerView
+              tasks={tasks}
+              today={today}
+              selectedId={selectedId}
+              onSelect={(id) => {
+                setSelectedId((cur) => (cur === id ? null : id));
+              }}
+              onStatusChange={(id, status) => updateTask(id, { status })}
+              suggestions={suggestions}
+              onAssigneeChange={(id, assignee) => updateTask(id, { assignee })}
+              onSlotChange={setSlot}
+              onOpenFlow={() => setTab("flow")}
+            />
+          ) : (
+            <>
+              <div className="grid gap-3 lg:min-h-[560px] lg:grid-cols-2">
+                <SourcePanel
+                  value={text}
+                  onChange={handleTextChange}
+                  samples={samples}
+                  activeSampleId={activeSampleId}
+                  onInjectSample={injectSample}
+                  onExtract={extract}
+                  loading={loading}
+                  highlight={highlight}
+                  onExitHighlight={() => setSelectedId(null)}
+                  error={error}
+                />
+                <TaskList
+                  tasks={tasks}
+                  selectedId={selectedId}
+                  today={today}
+                  onSelect={selectTask}
+                  onPriorityChange={(id, priority: Priority) =>
+                    updateTask(id, { priority })
+                  }
+                  onAssigneeChange={(id, assignee) =>
+                    updateTask(id, { assignee })
+                  }
+                  suggestions={suggestions}
+                  onClear={() => {
+                    if (tasks.some((t) => t.origin === "server")) {
+                      void fetch("/api/tasks", { method: "DELETE" }).catch(
+                        () => undefined,
+                      );
+                    }
+                    setTasks([]);
+                    setSelectedId(null);
+                  }}
+                />
+              </div>
 
-      <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[13px] font-semibold text-ink">
-            직무별 칸반
-          </h2>
-          <p className="text-[11px] text-ink-4">
-            카드를 끌어 상태를 바꾸고, 다른 직무 레인에 놓으면 직무도 함께
-            바뀝니다
-          </p>
-        </div>
-        <KanbanBoard
-          tasks={tasks}
-          today={today}
-          selectedId={selectedId}
-          onSelect={selectTask}
-          onMove={moveTask}
-        />
-      </section>
-      </>
+              <section className="space-y-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <h2 className="text-[13.5px] font-semibold text-ink">
+                    직무별 칸반
+                  </h2>
+                  <p className="text-[11px] text-ink-4">
+                    카드를 끌어 상태를 바꾸고, 다른 직무 레인에 놓으면 직무도 함께
+                    바뀝니다
+                  </p>
+                </div>
+                <KanbanBoard
+                  tasks={tasks}
+                  today={today}
+                  selectedId={selectedId}
+                  onSelect={selectTask}
+                  onMove={moveTask}
+                />
+              </section>
+            </>
+          )}
+        </>
       )}
     </main>
   );
