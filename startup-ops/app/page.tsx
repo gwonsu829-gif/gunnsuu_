@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import IntegrationStatus, { Integrations } from "@/components/IntegrationStatus";
 import KanbanBoard from "@/components/KanbanBoard";
+import MonthView from "@/components/MonthView";
 import PlannerView from "@/components/PlannerView";
+import WeekView from "@/components/WeekView";
 import SourcePanel from "@/components/SourcePanel";
 import StageView from "@/components/StageView";
 import SummaryStrip from "@/components/SummaryStrip";
@@ -37,7 +39,15 @@ export default function Page() {
    * 인입 — 직무별로 쌓인 것. "새로 뭐가 들어왔고 분류가 맞나"
    * 흐름 — 한 건이 어디까지 왔나. "왜 아직 안 끝났나"
    */
-  const [tab, setTab] = useState<"today" | "inbox" | "flow">("today");
+  const [tab, setTab] = useState<"today" | "inbox" | "flow" | "calendar">(
+    "today",
+  );
+  /*
+   * 달력은 탭을 둘로 쪼개지 않고 안에서 월·주를 바꾼다.
+   * 둘 다 "언제 하기로 했나"에 답하는 같은 질문이라, 탭을 나누면
+   * 사용자가 답이 아니라 화면 이름을 먼저 골라야 한다.
+   */
+  const [달력보기, set달력보기] = useState<"month" | "week">("week");
   /** 진단 도구는 평소에 접어둔다. 매일 쓰는 화면이 관리자 버튼에 밀리면 안 된다. */
   const [toolsOpen, setToolsOpen] = useState(false);
 
@@ -250,6 +260,13 @@ export default function Page() {
       count: tasks.length,
     },
     {
+      key: "calendar" as const,
+      label: "일정",
+      question: "언제 하기로 했나요?",
+      // 아직 시간을 안 잡은 것이 이 화면에서 손댈 거리다.
+      count: tasks.filter((t) => t.status !== "완료" && !t.slot).length,
+    },
+    {
       key: "flow" as const,
       label: "진행 상황",
       question: "왜 아직 안 끝났나요?",
@@ -451,7 +468,55 @@ export default function Page() {
             ))}
           </nav>
 
-          {tab === "flow" ? (
+          {tab === "calendar" ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-0.5 self-start rounded-md border border-line bg-surface p-0.5">
+                {(
+                  [
+                    ["week", "주"],
+                    ["month", "월"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => set달력보기(key)}
+                    aria-current={달력보기 === key}
+                    className={`rounded px-3 py-1 text-[11.5px] transition ${
+                      달력보기 === key
+                        ? "bg-accent font-medium text-white"
+                        : "text-ink-3 hover:bg-sunk"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {달력보기 === "week" ? (
+                <WeekView
+                  tasks={tasks}
+                  today={today}
+                  selectedId={selectedId}
+                  onSelect={(id) =>
+                    setSelectedId((cur) => (cur === id ? null : id))
+                  }
+                  onSlotChange={setSlot}
+                  onOpenFlow={() => setTab("flow")}
+                />
+              ) : (
+                <MonthView
+                  tasks={tasks}
+                  today={today}
+                  selectedId={selectedId}
+                  onSelect={(id) =>
+                    setSelectedId((cur) => (cur === id ? null : id))
+                  }
+                  onOpenWeek={() => set달력보기("week")}
+                />
+              )}
+            </div>
+          ) : tab === "flow" ? (
             <StageView
               tasks={tasks}
               today={today}
