@@ -6,6 +6,7 @@ import { MetaBadge, RoleBadge } from "./Badge";
 import { formatDue, isDueToday, isOverdue } from "@/lib/dates";
 import { PRIORITY_STYLE } from "@/lib/roles";
 import { UNASSIGNED, assigneeOptions, teamRoleOf } from "@/lib/team";
+import { useTeam } from "./TeamContext";
 import { AssigneeSuggestion } from "@/lib/suggest";
 import { PRIORITIES, Priority, Task } from "@/lib/types";
 
@@ -31,7 +32,8 @@ export default function TaskCard({
   const overdue = isOverdue(task.dueDate, today);
   const dueToday = isDueToday(task.dueDate, today);
   const unassigned = task.assignee === UNASSIGNED;
-  const teamRole = teamRoleOf(task.assignee);
+  const team = useTeam();
+  const teamRole = teamRoleOf(task.assignee, team);
 
   return (
     <div
@@ -81,7 +83,7 @@ export default function TaskCard({
 
         <BadgeSelect
           value={task.assignee}
-          options={assigneeOptions(task.assignee)}
+          options={assigneeOptions(task.assignee, team)}
           onChange={(v) => onAssigneeChange(task.id, v)}
           className={
             unassigned

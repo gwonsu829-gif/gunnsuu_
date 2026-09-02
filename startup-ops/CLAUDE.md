@@ -78,7 +78,19 @@ Discord (채널 + 스레드)   │        │                    │
 | `lib/discord.ts` | 디스코드 API (스레드 포함) |
 | `lib/store.ts` | Upstash Redis / 메모리 강등 |
 | `lib/eval.ts`, `lib/eval-set.ts` | 정확도 측정과 정답지 |
-| `docs/gmail-forwarder.gs` | Gmail Apps Script |
+| `docs/gmail-forwarder.gs` | Gmail Apps Script (구글 OAuth를 못 쓸 때의 대안) |
+| `components/Dashboard.tsx` | **화면 상태를 전부 쥐고 있는 곳** (page.tsx에서 옮겨옴). 탭 6개, 30초 폴링, 충돌 처리 |
+| `components/AppShell.tsx` | 사이드바 + 검색줄 + 이름 선택 |
+| `components/OverviewView.tsx` | 대시보드 첫 화면. 지표·차트·팀 현황·오늘 일정·최근 활동 |
+| `components/MailView.tsx`, `SettingsView.tsx` | 메일함, 설정 |
+| `lib/google.ts` | 구글 OAuth. 토큰은 저장소 `json:google:tokens` 한 벌 |
+| `lib/mail.ts` | Gmail 읽기 → 규칙 → Gemini 분류 → 저장 → Gmail 라벨 |
+| `lib/calendar.ts` | 캘린더 양방향. `opsTaskId`가 있는 이벤트만 우리 것 |
+| `lib/gemini.ts` | Gemini REST 호출 (SDK 없음) |
+| `lib/settings.ts` | 팀 명단·키워드 규칙·메일 조건. 저장소에 한 벌 |
+| `lib/audit.ts` | "누가 뭘 바꿨나" 이력 |
+| `lib/auth.ts`, `middleware.ts` | 팀 접근코드 |
+| `app/api/google/*`, `app/api/mail/*`, `app/api/calendar/*`, `app/api/settings`, `app/api/audit` | 위 것들의 라우트 |
 
 ---
 
@@ -139,6 +151,36 @@ Apps Script가 라벨을 떼지 않게 한다.
 
 `lib/webhook-auth.ts`. 설정을 깜빡한 배포가 조용히 아무나 쓸 수 있는 상태로 열리는 게 더 나쁘다.
 
+### 10. 동시 수정은 거절한다. 덮어쓰지 않는다
+
+`lib/store.ts` `updateTask`의 `expectedVersion`. 세 사람이 같은 카드를 만지면 나중 쪽이 409를 받고
+화면이 최신 값으로 갈아끼워진다. "내가 분명 바꿨는데"가 두 사람 사이에서 반복되는 것보다 낫다.
+서버가 version을 올리므로 화면은 자기가 본 version을 그대로 보낸다. 안 보내면 검사하지 않는다(옛 화면 호환).
+
+### 11. 메일 분류가 실패하면 표시를 거두고 다음에 다시 읽는다
+
+`lib/mail.ts`. 1번과 같은 원칙. 추측 라벨을 Gmail에 붙이고 넘어가면 그 메일은 영영 잘못 분류된 채 남는다.
+`seen:gmail:<id>`는 성공했을 때만 남는다.
+
+### 12. 키워드 규칙이 AI보다 앞선다. "참고" 규칙은 할일도 막는다
+
+`lib/settings.ts` `applyKeywordRules`. 회사에서만 쓰는 말(고객사 이름, 공고 이름)은 모델이 모른다.
+규칙에 "참고"가 걸리면 Gemini가 actionable이라 해도 할일을 만들지 않는다 — 뉴스레터에서 할일이 나오는 오탐이 더 나쁘다.
+
+### 13. 구글 계정은 하나다
+
+`lib/google.ts`. 대표님 계정 하나를 연결하고 세 사람이 그 메일함·캘린더를 본다.
+사람마다 OAuth를 태우면 "누구 캘린더에 올릴까"부터 다시 정해야 한다. 3인 팀에서 그 복잡도는 얻는 것보다 잃는 게 많다.
+
+### 14. 캘린더 이벤트는 opsTaskId가 있는 것만 우리 것이다
+
+`lib/calendar.ts`. 되돌릴 때 이 속성이 없는 이벤트는 건드리지 않는다. 남의 회의가 할일이 되면 안 된다.
+syncToken 요청은 처음 요청과 같은 조건이어야 한다(구글 규칙) — `singleEvents`, `showDeleted`를 빼지 말 것.
+
+### 15. 팀 명단·규칙은 환경변수가 아니라 설정 화면이다
+
+`lib/settings.ts`. 대표님이 화면에서 바로 바꿔야 하는 값을 재배포 뒤에 두면 결국 안 바꾼다.
+
 ---
 
 ## 알려진 함정
@@ -161,8 +203,15 @@ Apps Script가 라벨을 떼지 않게 한다.
 Vercel Settings → Environment Variables.
 
 ```
-ANTHROPIC_API_KEY      필수. 없으면 데모 모드
-INGEST_SECRET          필수. 없으면 수집 엔드포인트가 닫힌다
+ANTHROPIC_API_KEY      추출용. 없으면 GEMINI_API_KEY로, 둘 다 없으면 데모 모드
+GEMINI_API_KEY         메일 분류·요약 (필수에 가깝다). AI_PROVIDER=gemini면 추출도 이걸로
+GEMINI_MODEL           선택. 기본 gemini-2.5-flash
+GOOGLE_CLIENT_ID       구글 OAuth (Gmail + 캘린더)
+GOOGLE_CLIENT_SECRET
+GOOGLE_REDIRECT_URI    선택. 비우면 요청 도메인/api/google/callback
+GOOGLE_CALENDAR_ID     선택. 비우면 primary
+APP_PASSCODE           팀 접근코드. 없으면 잠그지 않는다 (배포에서는 꼭)
+INGEST_SECRET          웹훅·크론 비밀. 없으면 수집 엔드포인트가 닫힌다
 DISCORD_BOT_TOKEN
 DISCORD_CHANNELS       "채널ID:#이름, 채널ID:#이름"
 DISCORD_DIGEST_CHANNEL 선택. 없으면 첫 채널로 보낸다
@@ -171,7 +220,7 @@ KV_REST_API_TOKEN
 CRON_SECRET            선택
 ```
 
-모델은 `claude-sonnet-5`. `lib/extract.ts`의 `MODEL` 상수.
+추출 모델은 `claude-sonnet-5`(`lib/extract.ts`의 `MODEL`) 또는 Gemini(`GEMINI_MODEL`). 메일 분류는 항상 Gemini.
 **이 모델은 `temperature`와 `budget_tokens`를 거부한다.** `output_config: { effort }`를 쓴다.
 
 ---
@@ -224,6 +273,13 @@ CRON_SECRET            선택
 
 ### 일부러 만들지 않은 것 (되살리기 전에 확인할 것)
 
-- **Calendar 연동** — 건바이건 방식이 잘 돌아가고 있어 대체하지 않기로 했다.
 - **Sheets 양방향 동기화** — 어느 쪽이 진실인지 정하는 문제라 섣불리 만들면 지금보다 나빠진다.
-- **계정·권한** — 3인 단일 보드 전제.
+- **사람별 계정·권한** — 접근코드 + 이름 선택까지만. 3인 단일 보드 전제.
+- **Gmail 본문 보기** — Gmail을 다시 만들지 않는다. 링크 한 번이면 된다.
+
+### 2026-09 리디자인에서 확인한 것
+
+- 타입 검사·단위 테스트(`lib/*.test.ts`, 설정·저장소·메일 파싱)는 통과했다.
+- **실제 구글 계정·Gemini 키로 끝까지 돌려본 적은 없다.** 처음 연결할 때 `/api/health`와
+  메일함의 "지금 동기화" 결과, 설정 화면의 안내문을 보며 확인할 것.
+- 옛 `page.tsx`의 `toTask`가 `slot`을 빠뜨려 저장된 시간이 화면에 안 보이던 것을 고쳤다.

@@ -2,6 +2,7 @@ import { todayISO } from "./dates";
 import { findDuplicateAmong } from "./dedupe";
 import { runExtraction } from "./extract";
 import { StoredTask, TaskSource, getStore } from "./store";
+import { ExtractedTask } from "./types";
 
 export interface IngestInput {
   text: string;
@@ -83,26 +84,12 @@ export async function ingestText(input: IngestInput): Promise<IngestResult> {
     };
   }
 
-  const existing = await store.listTasks();
-  const fresh: StoredTask[] = [];
-  let duplicates = 0;
-
-  for (const t of outcome.tasks) {
-    // 같은 실행 안에서 나온 것끼리도 겹칠 수 있어 함께 비교한다.
-    const dup = findDuplicateAmong(t.title, [...existing, ...fresh]);
-    if (dup) duplicates += 1;
-    fresh.push({
-      ...t,
-      id: newId(),
-      channel: input.channel,
-      sourceLabel: input.sourceLabel,
-      rawText: text,
-      createdAt: input.receivedAt ?? new Date().toISOString(),
-      duplicateOf: dup?.id,
-    });
-  }
-
-  await store.addTasks(fresh);
+  const { fresh, duplicates } = await storeExtracted(outcome.tasks, {
+    channel: input.channel,
+    sourceLabel: input.sourceLabel,
+    rawText: text,
+    receivedAt: input.receivedAt,
+  });
 
   return {
     added: fresh.length,
@@ -111,4 +98,44 @@ export async function ingestText(input: IngestInput): Promise<IngestResult> {
     demo: outcome.demo,
     demoReason: outcome.demoReason,
   };
+}
+
+/**
+ * 뽑힌 할일을 중복 표시와 함께 저장한다.
+ * 메일 동기화(lib/mail.ts)도 이 길을 지난다 — 중복 판정이 경로마다 달라지면 안 된다.
+ */
+export async function storeExtracted(
+  tasks: ExtractedTask[],
+  meta: {
+    channel: TaskSource;
+    sourceLabel: string;
+    rawText: string;
+    receivedAt?: string;
+    mailId?: string;
+  },
+): Promise<{ fresh: StoredTask[]; duplicates: number }> {
+  const store = getStore();
+  const existing = await store.listTasks();
+  const fresh: StoredTask[] = [];
+  let duplicates = 0;
+
+  for (const t of tasks) {
+    // 같은 실행 안에서 나온 것끼리도 겹칠 수 있어 함께 비교한다.
+    const dup = findDuplicateAmong(t.title, [...existing, ...fresh]);
+    if (dup) duplicates += 1;
+    fresh.push({
+      ...t,
+      id: newId(),
+      channel: meta.channel,
+      sourceLabel: meta.sourceLabel,
+      rawText: meta.rawText,
+      createdAt: meta.receivedAt ?? new Date().toISOString(),
+      duplicateOf: dup?.id,
+      mailId: meta.mailId,
+      version: 0,
+    });
+  }
+
+  await store.addTasks(fresh);
+  return { fresh, duplicates };
 }

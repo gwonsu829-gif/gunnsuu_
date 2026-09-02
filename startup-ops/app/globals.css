@@ -66,7 +66,7 @@ h3 {
   outline-offset: 1px;
 }
 
-/* 도구 패널이 펼쳐질 때. 갑자기 나타나면 어디서 나온 건지 놓친다 */
+/* 패널·토스트가 펼쳐질 때. 갑자기 나타나면 어디서 나온 건지 놓친다 */
 @keyframes drop-in {
   from {
     opacity: 0;
@@ -80,8 +80,29 @@ h3 {
 .drop-in {
   animation: drop-in 0.14s ease-out;
 }
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise-in {
+  animation: rise-in 0.18s ease-out;
+}
 @media (prefers-reduced-motion: reduce) {
-  .drop-in {
+  .drop-in,
+  .rise-in {
     animation: none;
   }
+}
+
+/* 카드 한 벌. 컴포넌트마다 테두리·그림자 조합이 달라지지 않게 한 곳에 둔다 */
+.card {
+  background-color: theme("colors.surface");
+  border-radius: theme("borderRadius.lg");
+  box-shadow: theme("boxShadow.card");
 }

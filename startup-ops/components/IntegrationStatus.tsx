@@ -8,6 +8,10 @@ export interface Integrations {
   디스코드: boolean;
   디스코드_채널: string[];
   AI: boolean;
+  AI_제공자?: "anthropic" | "gemini" | null;
+  구글?: boolean;
+  구글_계정?: string | null;
+  구글_설정됨?: boolean;
 }
 
 function Lamp({ on, label, note }: { on: boolean; label: string; note?: string }) {
