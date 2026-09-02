@@ -140,7 +140,14 @@ export function normalizeSettings(raw: unknown): Settings {
 
   const team: TeamMember[] = [];
   if (Array.isArray(r.team)) {
-    for (const [i, m] of r.team.slice(0, MAX_TEAM).entries()) {
+    /*
+     * 인덱스가 필요하지만 .entries()는 쓰지 않는다.
+     * 이 프로젝트의 tsconfig에는 target이 없어 ES5로 잡히고, 그러면 이터레이터 순회가
+     * 빌드에서 거부된다(TS2802). 배열 for...of는 괜찮지만 .entries()는 이터레이터다.
+     */
+    const rawTeam = r.team.slice(0, MAX_TEAM);
+    for (let i = 0; i < rawTeam.length; i += 1) {
+      const m = rawTeam[i];
       const mm = (typeof m === "object" && m !== null ? m : {}) as Record<string, unknown>;
       const name = cleanString(mm.name, 20);
       if (!name) continue;
