@@ -30,8 +30,18 @@ export function buildSystemPrompt(today: string): string {
 - 할일이 하나도 없으면 빈 배열 []을 출력한다.`;
 }
 
-export function buildUserPrompt(text: string): string {
-  return `아래는 오늘 들어온 원문이다. 여기서 할일을 추출해 JSON 배열로만 답하라.
+export function buildUserPrompt(text: string, mustExtract = false): string {
+  /*
+   * mustExtract는 사람이 "이건 할일이다"라고 이미 표시한 원문에 쓴다 (디스코드 📌).
+   * 판단이 끝난 것이라 빈 배열이 나오면 그 표시가 무시된 셈이고, 사람은
+   * 자기가 콕 집은 것이 사라진 이유를 알 길이 없다. 그래서 최소 한 건은 뽑게 한다.
+   */
+  const 지시 = mustExtract
+    ? `아래 대화는 사람이 "이건 할일이다"라고 직접 표시한 것이다. 마지막 발화가 표시된 메시지이고 그 앞은 맥락이다.
+할일이 없다고 판단하지 말고, 마지막 메시지에서 해야 할 일을 반드시 한 건 이상 뽑아라. 기한이나 담당자를 모르면 "미정"/"미지정"으로 둔다.`
+    : `아래는 오늘 들어온 원문이다. 여기서 할일을 추출해 JSON 배열로만 답하라.`;
+
+  return `${지시}
 
 <원문>
 ${text}

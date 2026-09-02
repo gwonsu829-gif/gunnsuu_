@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { todayISO } from "@/lib/dates";
 import { buildDigest } from "@/lib/digest";
-import { readBotToken, readDigestChannelId, sendMessage } from "@/lib/discord";
+import { readBotToken, resolveDigestChannel, sendMessage } from "@/lib/discord";
 import { getStore } from "@/lib/store";
 import { checkCronAuth } from "@/lib/webhook-auth";
 
@@ -38,12 +38,12 @@ export async function GET(request: Request) {
   }
 
   const token = readBotToken();
-  const channelId = readDigestChannelId();
+  const channelId = token ? await resolveDigestChannel(token, await getStore().getSettings()) : null;
   if (!token || !channelId) {
     return NextResponse.json(
       {
         error:
-          "디스코드로 보낼 수 없습니다. DISCORD_BOT_TOKEN과 보낼 채널(DISCORD_DIGEST_CHANNEL 또는 DISCORD_CHANNELS)이 필요합니다.",
+          "디스코드로 보낼 수 없습니다. DISCORD_BOT_TOKEN이 있고 봇이 보낼 수 있는 채널이 하나는 있어야 합니다. (설정 → 디스코드에서 요약 채널을 지정할 수 있습니다)",
         본문: digest.text,
       },
       { status: 503 },

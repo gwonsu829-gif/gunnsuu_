@@ -75,10 +75,23 @@ Discord (채널 + 스레드)   │        │                    │
 | `lib/suggest.ts` | 담당자 추천 |
 | `lib/stages.ts` | '흐름' 탭의 6단계 계산 |
 | `lib/digest.ts` | 아침 요약 본문 |
-| `lib/discord.ts` | 디스코드 API (스레드 포함) |
+| `lib/discord.ts` | 디스코드 API. 서버·채널 자동 조회, 반응 읽기, 스레드 |
 | `lib/store.ts` | Upstash Redis / 메모리 강등 |
 | `lib/eval.ts`, `lib/eval-set.ts` | 정확도 측정과 정답지 |
-| `docs/gmail-forwarder.gs` | Gmail Apps Script |
+| `docs/gmail-forwarder.gs` | Gmail Apps Script (구글 OAuth를 못 쓸 때의 대안) |
+| `components/Dashboard.tsx` | **화면 상태를 전부 쥐고 있는 곳** (page.tsx에서 옮겨옴). 탭 6개, 30초 폴링, 충돌 처리 |
+| `components/AppShell.tsx` | 사이드바 + 검색줄 + 이름 선택 |
+| `components/OverviewView.tsx` | 대시보드 첫 화면. 지표·차트·팀 현황·오늘 일정·최근 활동 |
+| `components/MailView.tsx`, `SettingsView.tsx` | 메일함, 설정 |
+| `lib/google.ts` | 구글 OAuth. 토큰은 저장소 `json:google:tokens` 한 벌 |
+| `lib/mail.ts` | Gmail 읽기 → 규칙 → Gemini 분류 → 저장 → Gmail 라벨 |
+| `lib/calendar.ts` | 캘린더 양방향. `opsTaskId`가 있는 이벤트만 우리 것 |
+| `lib/gemini.ts` | Gemini REST 호출 (SDK 없음) |
+| `lib/settings.ts` | 팀 명단·키워드 규칙·메일 조건. 저장소에 한 벌 |
+| `lib/audit.ts` | "누가 뭘 바꿨나" 이력 |
+| `lib/usage.ts` | AI 호출 계량·일일 상한. **요금이 새어 나가지 않게 하는 곳** |
+| `lib/auth.ts`, `middleware.ts` | 팀 접근코드 |
+| `app/api/google/*`, `app/api/mail/*`, `app/api/calendar/*`, `app/api/settings`, `app/api/audit` | 위 것들의 라우트 |
 
 ---
 
@@ -139,13 +152,87 @@ Apps Script가 라벨을 떼지 않게 한다.
 
 `lib/webhook-auth.ts`. 설정을 깜빡한 배포가 조용히 아무나 쓸 수 있는 상태로 열리는 게 더 나쁘다.
 
+### 10. 동시 수정은 거절한다. 덮어쓰지 않는다
+
+`lib/store.ts` `updateTask`의 `expectedVersion`. 세 사람이 같은 카드를 만지면 나중 쪽이 409를 받고
+화면이 최신 값으로 갈아끼워진다. "내가 분명 바꿨는데"가 두 사람 사이에서 반복되는 것보다 낫다.
+서버가 version을 올리므로 화면은 자기가 본 version을 그대로 보낸다. 안 보내면 검사하지 않는다(옛 화면 호환).
+
+### 11. 메일 분류가 실패하면 표시를 거두고 다음에 다시 읽는다
+
+`lib/mail.ts`. 1번과 같은 원칙. 추측 라벨을 Gmail에 붙이고 넘어가면 그 메일은 영영 잘못 분류된 채 남는다.
+`seen:gmail:<id>`는 성공했을 때만 남는다.
+
+### 12. 키워드 규칙이 AI보다 앞선다. "참고" 규칙은 할일도 막는다
+
+`lib/settings.ts` `applyKeywordRules`. 회사에서만 쓰는 말(고객사 이름, 공고 이름)은 모델이 모른다.
+규칙에 "참고"가 걸리면 Gemini가 actionable이라 해도 할일을 만들지 않는다 — 뉴스레터에서 할일이 나오는 오탐이 더 나쁘다.
+
+### 13. 구글 계정은 하나다
+
+`lib/google.ts`. 대표님 계정 하나를 연결하고 세 사람이 그 메일함·캘린더를 본다.
+사람마다 OAuth를 태우면 "누구 캘린더에 올릴까"부터 다시 정해야 한다. 3인 팀에서 그 복잡도는 얻는 것보다 잃는 게 많다.
+
+### 14. 캘린더 이벤트는 opsTaskId가 있는 것만 우리 것이다
+
+`lib/calendar.ts`. 되돌릴 때 이 속성이 없는 이벤트는 건드리지 않는다. 남의 회의가 할일이 되면 안 된다.
+syncToken 요청은 처음 요청과 같은 조건이어야 한다(구글 규칙) — `singleEvents`, `showDeleted`를 빼지 말 것.
+
+### 15. 팀 명단·규칙·디스코드 채널은 환경변수가 아니라 설정 화면이다
+
+`lib/settings.ts`. 대표님이 화면에서 바로 바꿔야 하는 값을 재배포 뒤에 두면 결국 안 바꾼다.
+디스코드 채널 ID를 `DISCORD_CHANNELS`에 적던 것을 여기로 옮겼다 — 봇이 서버에 있으면
+채널 목록은 봇이 스스로 아는 정보라, 사람이 ID를 복사할 이유가 애초에 없었다.
+
+### 16. 디스코드 자동 수집의 기본은 "모든 채널"이다
+
+`lib/settings.ts`의 `DEFAULT_SETTINGS.discord.mode`. 고르게 만들면 새 프로젝트 채널이
+생길 때마다 누군가 설정을 열어야 하고, 그 한 번을 잊으면 그 채널의 할일이 통째로 사라진다.
+빼는 쪽이 훨씬 드물다. 못 읽는 채널은 403을 받은 뒤 일주일간 건너뛴다(`discord:blocked`) —
+"모든 채널" 모드에서는 서버의 모든 채널이 목록에 오므로, 기억하지 않으면 매 실행마다 같은 403을 받는다.
+
+### 17. 📌 반응은 커서로 못 잡는다. 최근 구간을 따로 훑는다
+
+`lib/discord-collect.ts`. 반응은 **지나간 메시지에도** 붙는다. `after` 커서로 읽으면
+새 메시지만 오므로 📌가 영영 안 보인다. 그래서 커서 조회와 별개로 최근 50건을 다시 훑는다.
+요청이 한 번 더 드는 건 알고 한 것이다 — 이 기능의 값어치가 "자동 수집이 놓친 걸 나중에 집어넣을 수 있다"에 있다.
+
+메시지 id 비교는 반드시 BigInt로 한다(`isNewerThan`). 문자열로 비교하면 자릿수가 바뀌는
+순간(`999...` → `1000...`) 새 메시지를 통째로 놓치는데, 화면에는 "새 메시지 없음"으로 보여 알아채기 어렵다.
+
+### 18. AI 호출에는 하루 상한이 있고, 닿으면 멈추되 원문은 남긴다
+
+`lib/usage.ts`. 요금 걱정 때문에 기능을 꺼 두게 되는 것이 가장 나쁜 결과다. 상한을 코드로 걸면
+초과가 구조적으로 불가능해지고, 그때부터 걱정 없이 켜 둘 수 있다.
+
+상한에 닿으면 커서를 옮기지 않고 처리 표시도 남기지 않는다 — 다음 날 그대로 이어서 읽는다.
+설계 결정 1번(수집 경로에서는 폴백을 저장하지 않는다)과 같은 원칙이다: **미뤄지는 건 괜찮고 사라지는 건 안 된다.**
+
+📌와 붙여넣기는 상한 밖이다. 사람이 지금 확정한 것을 요금 때문에 막으면 그건 고장이다.
+
+호출은 요청 직전에 센다. 실패해도 요금과 무료 등급 한도는 요청 수로 깎이므로,
+성공만 세면 화면 숫자가 실제보다 작아 사람을 안심시킨다.
+
+`aiDailyLimit: 0`은 "상한 없음"이지 "한 번도 못 씀"이 아니다. 이 둘을 헷갈리면 수집이 통째로 멈춘다
+(`lib/usage.test.ts`에 확인이 있다).
+
+### 19. 콕 집은 원문에서는 빈 배열을 허용하지 않는다
+
+`lib/prompt.ts`의 `mustExtract`. 사람이 이미 "이건 할일이다"라고 표시한 것이라 판단은 끝났다.
+빈 배열이 나오면 그 표시가 무시된 셈이고, 사람은 자기가 콕 집은 것이 사라진 이유를 알 길이 없다.
+
 ---
 
 ## 알려진 함정
 
 | 증상 | 원인 |
 |---|---|
+| 빌드에서 TS2802 (이터레이터 순회) | **tsconfig에 `target`이 없어 ES5로 잡힌다.** 배열 `for...of`는 되지만 `.entries()`·Map·Set 순회는 빌드에서 막힌다. 인덱스가 필요하면 `for (let i = 0; ...)`로 쓸 것 |
 | 계속 데모 모드 | `ANTHROPIC_API_KEY` 이름·값 확인. `/api/health`가 공백·따옴표까지 알려준다 |
+| 디스코드 본문이 빈 채로 옴 | 봇 설정의 Message Content Intent가 꺼져 있다 |
+| 📌를 눌러도 안 들어옴 | 설정의 이모지와 실제 반응이 다르거나, 그 메시지가 최근 50건 밖으로 밀려났다 |
+| 갑자기 아무것도 안 들어옴 | 오늘 AI 상한에 닿았다. 설정 → AI 사용량에서 확인. 내일 이어서 읽는다 |
+| 디스코드 대화가 안 잡힘 | 한 채널에 3건은 쌓여야 부른다(`MIN_MESSAGES`). 급하면 📌를 붙이면 즉시 들어온다 |
 | Apps Script 401 | `INGEST_SECRET`이 양쪽에서 달라졌다 |
 | 값을 바꿨는데 반영 안 됨 | 재배포를 안 했다 |
 | 버튼이 안 눌림 (로컬) | 옛 빌드를 문 서버. 위의 "로컬에서 테스트할 때" 참고 |
@@ -161,17 +248,22 @@ Apps Script가 라벨을 떼지 않게 한다.
 Vercel Settings → Environment Variables.
 
 ```
-ANTHROPIC_API_KEY      필수. 없으면 데모 모드
-INGEST_SECRET          필수. 없으면 수집 엔드포인트가 닫힌다
-DISCORD_BOT_TOKEN
-DISCORD_CHANNELS       "채널ID:#이름, 채널ID:#이름"
-DISCORD_DIGEST_CHANNEL 선택. 없으면 첫 채널로 보낸다
+ANTHROPIC_API_KEY      추출용. 없으면 GEMINI_API_KEY로, 둘 다 없으면 데모 모드
+GEMINI_API_KEY         메일 분류·요약 (필수에 가깝다). AI_PROVIDER=gemini면 추출도 이걸로
+GEMINI_MODEL           선택. 기본 gemini-2.5-flash
+GOOGLE_CLIENT_ID       구글 OAuth (Gmail + 캘린더)
+GOOGLE_CLIENT_SECRET
+GOOGLE_REDIRECT_URI    선택. 비우면 요청 도메인/api/google/callback
+GOOGLE_CALENDAR_ID     선택. 비우면 primary
+APP_PASSCODE           팀 접근코드. 없으면 잠그지 않는다 (배포에서는 꼭)
+INGEST_SECRET          웹훅·크론 비밀. 없으면 수집 엔드포인트가 닫힌다
+DISCORD_BOT_TOKEN      이것 하나면 된다. 채널·요약 채널·📌 이모지는 설정 화면에서 고른다
 KV_REST_API_URL        Upstash (Vercel 마켓플레이스 연동 시 자동)
 KV_REST_API_TOKEN
 CRON_SECRET            선택
 ```
 
-모델은 `claude-sonnet-5`. `lib/extract.ts`의 `MODEL` 상수.
+추출 모델은 `claude-sonnet-5`(`lib/extract.ts`의 `MODEL`) 또는 Gemini(`GEMINI_MODEL`). 메일 분류는 항상 Gemini.
 **이 모델은 `temperature`와 `budget_tokens`를 거부한다.** `output_config: { effort }`를 쓴다.
 
 ---
@@ -182,6 +274,8 @@ CRON_SECRET            선택
   기존 주석들이 그 톤이니 맞출 것.
 - 커밋 메시지도 한국어. 제목 한 줄 + 빈 줄 + 이유.
 - 타입은 strict. `any` 쓰지 말 것.
+- **타입 검사는 반드시 프로젝트 tsconfig로 한다.** `target`이 지정돼 있지 않아 ES5가 기본값이고,
+  target을 높여 검사하면 `.entries()` 같은 이터레이터 순회를 놓쳐 Vercel 빌드에서 터진다 (실제로 한 번 터뜨렸다).
 - Tailwind 클래스는 문자열을 통째로 적는다 (`bg-${x}-50` 같은 동적 조합은 빌드에서 잘린다).
 - 화면 문구는 사용자 말로 쓴다 ("웹훅 설정"이 아니라 "메일 수신").
 
@@ -224,6 +318,13 @@ CRON_SECRET            선택
 
 ### 일부러 만들지 않은 것 (되살리기 전에 확인할 것)
 
-- **Calendar 연동** — 건바이건 방식이 잘 돌아가고 있어 대체하지 않기로 했다.
 - **Sheets 양방향 동기화** — 어느 쪽이 진실인지 정하는 문제라 섣불리 만들면 지금보다 나빠진다.
-- **계정·권한** — 3인 단일 보드 전제.
+- **사람별 계정·권한** — 접근코드 + 이름 선택까지만. 3인 단일 보드 전제.
+- **Gmail 본문 보기** — Gmail을 다시 만들지 않는다. 링크 한 번이면 된다.
+
+### 2026-09 리디자인에서 확인한 것
+
+- 타입 검사·단위 테스트(`lib/*.test.ts`, 설정·저장소·메일 파싱)는 통과했다.
+- **실제 구글 계정·Gemini 키로 끝까지 돌려본 적은 없다.** 처음 연결할 때 `/api/health`와
+  메일함의 "지금 동기화" 결과, 설정 화면의 안내문을 보며 확인할 것.
+- 옛 `page.tsx`의 `toTask`가 `slot`을 빠뜨려 저장된 시간이 화면에 안 보이던 것을 고쳤다.

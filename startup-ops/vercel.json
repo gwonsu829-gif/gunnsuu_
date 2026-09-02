@@ -1,12 +1,8 @@
 {
   "crons": [
-    {
-      "path": "/api/ingest/discord",
-      "schedule": "50 23 * * *"
-    },
-    {
-      "path": "/api/digest",
-      "schedule": "0 0 * * *"
-    }
+    { "path": "/api/discord/sync", "schedule": "50 23 * * *" },
+    { "path": "/api/mail/sync", "schedule": "40 23 * * *" },
+    { "path": "/api/calendar/sync", "schedule": "45 23 * * *" },
+    { "path": "/api/digest", "schedule": "0 0 * * *" }
   ]
 }

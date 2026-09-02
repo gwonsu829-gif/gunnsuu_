@@ -1,10 +1,19 @@
+import { DiscordChannelInfo, DiscordGuildInfo, DiscordSettings, Settings } from "./types";
+
 const API = "https://discord.com/api/v10";
+
+export interface DiscordReaction {
+  count: number;
+  emoji: { id: string | null; name: string | null };
+}
 
 export interface DiscordMessage {
   id: string;
   content: string;
   timestamp: string;
   author: { username: string; global_name?: string | null; bot?: boolean };
+  /** 반응이 하나도 없으면 이 필드 자체가 오지 않는다. */
+  reactions?: DiscordReaction[];
 }
 
 /** 채널이든 그 아래 스레드든, 수집 대상은 같은 모양으로 다룬다. */
@@ -15,34 +24,114 @@ export interface CollectSource {
   parentId?: string;
 }
 
-export interface ChannelConfig {
-  id: string;
-  /** 화면에 보여줄 이름. 설정에 없으면 채널 ID를 그대로 쓴다. */
-  label: string;
-}
-
-/** DISCORD_CHANNELS="123456:#dev-일반, 789012:#cs-문의" */
-export function readChannelConfig(): ChannelConfig[] {
-  const raw = (process.env.DISCORD_CHANNELS ?? "").trim();
-  if (!raw) return [];
-  return raw
-    .split(",")
-    .map((chunk) => chunk.trim())
-    .filter(Boolean)
-    .map((chunk) => {
-      const sep = chunk.indexOf(":");
-      if (sep === -1) return { id: chunk, label: `채널 ${chunk}` };
-      return {
-        id: chunk.slice(0, sep).trim(),
-        label: chunk.slice(sep + 1).trim() || `채널 ${chunk.slice(0, sep).trim()}`,
-      };
-    })
-    .filter((c) => c.id);
-}
-
 export function readBotToken(): string {
   return (process.env.DISCORD_BOT_TOKEN ?? "").trim().replace(/^["']|["']$/g, "");
 }
+
+export class DiscordError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function discordGet<T>(token: string, path: string): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    headers: { Authorization: `Bot ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new DiscordError(
+      `디스코드 API ${res.status}${detail ? ` — ${detail.slice(0, 200)}` : ""}`,
+      res.status,
+    );
+  }
+  return (await res.json()) as T;
+}
+
+/* ---------------- 서버·채널 찾기 ---------------- */
+
+/**
+ * 봇이 들어가 있는 서버 목록.
+ *
+ * 예전에는 채널 ID를 환경변수에 적게 했는데, 봇이 이미 서버에 있으면
+ * 이 정보는 봇이 스스로 알 수 있다. 사람이 개발자 모드를 켜고 ID를 복사해
+ * 붙여넣고 재배포하는 과정이 통째로 필요 없다.
+ */
+export async function fetchGuilds(token: string): Promise<DiscordGuildInfo[]> {
+  const guilds = await discordGet<{ id: string; name: string }[]>(token, "/users/@me/guilds");
+  return guilds.map((g) => ({ id: g.id, name: g.name }));
+}
+
+/** 대화를 직접 읽을 수 있는 채널 종류. 4는 카테고리(폴더)라 이름만 쓴다. */
+const TEXT_TYPES = [0, 5];
+const FORUM_TYPE = 15;
+const CATEGORY_TYPE = 4;
+
+interface RawChannel {
+  id: string;
+  name: string;
+  type: number;
+  parent_id?: string | null;
+  position?: number;
+}
+
+/**
+ * 서버의 텍스트·공지·포럼 채널. 카테고리 이름을 붙여 화면에서 접어 보여줄 수 있게 한다.
+ *
+ * 주의: 이 목록에는 봇이 볼 수 없는 채널도 섞여 나온다. 권한은 여기서 판단하지 않고
+ * 실제로 읽어보고 403이 나면 그때 걸러낸다 (lib/discord-collect.ts의 blocked).
+ * 권한 계산을 흉내 내면 역할·오버라이드 조합에서 반드시 틀린다.
+ */
+export async function fetchGuildChannels(
+  token: string,
+  guildId: string,
+): Promise<DiscordChannelInfo[]> {
+  const raw = await discordGet<RawChannel[]>(token, `/guilds/${guildId}/channels`);
+  const categories = new Map<string, string>();
+  for (const c of raw) {
+    if (c.type === CATEGORY_TYPE) categories.set(c.id, c.name);
+  }
+  return raw
+    .filter((c) => TEXT_TYPES.includes(c.type) || c.type === FORUM_TYPE)
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      category: (c.parent_id && categories.get(c.parent_id)) || "",
+      type: c.type,
+    }));
+}
+
+/** 설정에 서버가 없으면 봇이 들어간 첫 서버를 쓴다. 3인 팀은 서버가 하나다. */
+export async function resolveGuildId(token: string, settings: DiscordSettings): Promise<string> {
+  if (settings.guildId) return settings.guildId;
+  const guilds = await fetchGuilds(token);
+  if (!guilds.length) {
+    throw new DiscordError("봇이 들어가 있는 서버가 없습니다. 봇을 서버에 초대하세요.");
+  }
+  return guilds[0].id;
+}
+
+/**
+ * 설정을 실제 수집 대상 채널로 바꾼다.
+ * mode가 off여도 채널 목록은 돌려준다 — 📌로 콕 집은 것은 그래도 읽어야 하기 때문.
+ */
+export function pickChannels(
+  all: DiscordChannelInfo[],
+  settings: DiscordSettings,
+): DiscordChannelInfo[] {
+  const readable = all.filter((c) => TEXT_TYPES.includes(c.type) || c.type === FORUM_TYPE);
+  if (settings.mode === "picked") {
+    return readable.filter((c) => settings.channels.includes(c.id));
+  }
+  // all / off 둘 다 "제외 목록을 뺀 전부"가 대상이다. off는 자동 추출만 건너뛴다.
+  return readable.filter((c) => !settings.excluded.includes(c.id));
+}
+
+/* ---------------- 메시지 ---------------- */
 
 /**
  * after 이후에 올라온 메시지를 오래된 순으로 돌려준다.
@@ -56,22 +145,27 @@ export async function fetchMessages(
 ): Promise<DiscordMessage[]> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (after) params.set("after", after);
-
-  const res = await fetch(`${API}/channels/${channelId}/messages?${params}`, {
-    headers: { Authorization: `Bot ${token}` },
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(
-      `디스코드 API ${res.status}${detail ? ` — ${detail.slice(0, 200)}` : ""}`,
-    );
-  }
-
-  const messages = (await res.json()) as DiscordMessage[];
+  const messages = await discordGet<DiscordMessage[]>(
+    token,
+    `/channels/${channelId}/messages?${params}`,
+  );
   // 디스코드는 최신순으로 준다. 대화 순서대로 읽어야 맥락이 산다.
   return messages.slice().reverse();
+}
+
+/**
+ * 이 메시지에 그 이모지가 붙어 있는지.
+ *
+ * 유니코드 이모지는 emoji.name에 글자가 그대로 온다(📌). 서버 전용 커스텀
+ * 이모지는 id가 있고 name이 ':' 없는 이름이라, 설정에 이름만 적어도 맞는다.
+ */
+export function hasReaction(m: DiscordMessage, emoji: string): boolean {
+  if (!emoji) return false;
+  const want = emoji.replace(/^:|:$/g, "");
+  return (m.reactions ?? []).some((r) => {
+    const name = r.emoji.name ?? "";
+    return name === emoji || name === want;
+  });
 }
 
 /**
@@ -90,6 +184,16 @@ export function toTranscript(label: string, messages: DiscordMessage[]): string 
 /** 봇이 자기 말이나 다른 봇 알림을 할일로 만들지 않게 한다. */
 export function isUsable(m: DiscordMessage): boolean {
   return !m.author.bot && m.content.trim().length > 0;
+}
+
+/** 스노플레이크는 시간순으로 커지는 숫자라 문자열 대신 BigInt로 비교한다. */
+export function isNewerThan(id: string, cursor: string | null): boolean {
+  if (!cursor) return true;
+  try {
+    return BigInt(id) > BigInt(cursor);
+  } catch {
+    return true;
+  }
 }
 
 /** "8/25 오전 10:12" — 사람이 쓴 디스코드 로그와 같은 모양으로 맞춘다. */
@@ -120,38 +224,11 @@ interface ThreadChannel {
   thread_metadata?: { archived?: boolean; archive_timestamp?: string };
 }
 
-async function discordGet<T>(token: string, path: string): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    headers: { Authorization: `Bot ${token}` },
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(
-      `디스코드 API ${res.status}${detail ? ` — ${detail.slice(0, 200)}` : ""}`,
-    );
-  }
-  return (await res.json()) as T;
-}
-
-/**
- * 서버 id를 설정으로 받지 않고 채널 하나를 조회해 알아낸다.
- * 사용자가 채널 id만 넣으면 되도록 하려는 것.
- */
-export async function fetchGuildId(
-  token: string,
-  channelId: string,
-): Promise<string> {
-  const ch = await discordGet<{ guild_id?: string }>(token, `/channels/${channelId}`);
-  if (!ch.guild_id) throw new Error("채널에서 서버 id를 찾지 못했습니다.");
-  return ch.guild_id;
-}
-
 /** 보관된 지 이만큼 지난 스레드는 지나간 대화로 보고 건드리지 않는다. */
 const ARCHIVED_WINDOW_DAYS = 7;
 
 /**
- * 설정한 채널들에 달린 스레드를 찾는다.
+ * 대상 채널들에 달린 스레드를 찾는다.
  *
  * 앰플랩 서버는 채널이 프로젝트 단위라 실제 업무 대화가 그 아래 스레드에서
  * 오간다. 채널 본문만 긁으면 그 대화가 통째로 누락된다.
@@ -161,11 +238,12 @@ const ARCHIVED_WINDOW_DAYS = 7;
  */
 export async function fetchThreads(
   token: string,
-  channels: ChannelConfig[],
+  guildId: string,
+  channels: DiscordChannelInfo[],
 ): Promise<CollectSource[]> {
   if (!channels.length) return [];
 
-  const wanted = new Map(channels.map((c) => [c.id, c.label]));
+  const wanted = new Map(channels.map((c) => [c.id, c.name]));
   const found = new Map<string, CollectSource>();
 
   const add = (t: ThreadChannel) => {
@@ -173,13 +251,12 @@ export async function fetchThreads(
     if (!parent || found.has(t.id)) return;
     found.set(t.id, {
       id: t.id,
-      label: `${parent} › ${t.name}`,
+      label: `#${parent} › ${t.name}`,
       parentId: t.parent_id ?? undefined,
     });
   };
 
   // 활성 스레드는 서버 단위로 한 번에 받아온다.
-  const guildId = await fetchGuildId(token, channels[0].id);
   const active = await discordGet<{ threads: ThreadChannel[] }>(
     token,
     `/guilds/${guildId}/threads/active`,
@@ -207,11 +284,26 @@ export async function fetchThreads(
   return Array.from(found.values());
 }
 
-/** 아침 요약을 보낼 채널. 없으면 수집 채널 중 첫 번째를 쓴다. */
-export function readDigestChannelId(): string | null {
-  const explicit = (process.env.DISCORD_DIGEST_CHANNEL ?? "").trim();
-  if (explicit) return explicit;
-  return readChannelConfig()[0]?.id ?? null;
+/* ---------- 보내기 ---------- */
+
+/**
+ * 아침 요약을 보낼 채널.
+ *
+ * 설정에 지정한 채널이 있으면 그것을, 없으면 수집 대상 중 첫 번째 텍스트 채널을 쓴다.
+ * 예전에는 DISCORD_DIGEST_CHANNEL 환경변수였는데, 채널을 바꾸려고 재배포하게 만들 이유가 없다.
+ */
+export async function resolveDigestChannel(
+  token: string,
+  settings: Settings,
+): Promise<string | null> {
+  if (settings.discord.digestChannel) return settings.discord.digestChannel;
+  try {
+    const guildId = await resolveGuildId(token, settings.discord);
+    const channels = pickChannels(await fetchGuildChannels(token, guildId), settings.discord);
+    return channels.find((c) => TEXT_TYPES.includes(c.type))?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function sendMessage(
@@ -229,8 +321,9 @@ export async function sendMessage(
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(
+    throw new DiscordError(
       `디스코드 전송 ${res.status}${detail ? ` — ${detail.slice(0, 200)}` : ""}`,
+      res.status,
     );
   }
 }

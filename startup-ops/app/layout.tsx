@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "업무 자동 분류 대시보드",
+  title: "앰플랩 업무 대시보드",
   description:
-    "이메일과 디스코드에 흩어진 할일을 자동으로 추출해 직무별로 분류·우선순위화합니다.",
+    "메일·디스코드·캘린더에 흩어진 할일을 한곳에 모아 직무별로 분류하고, 세 사람이 겹치지 않게 나눠 처리합니다.",
 };
 
 export default function RootLayout({

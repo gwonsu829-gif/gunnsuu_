@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { clockKST, isOnDate } from "@/lib/activity";
 import { addDays, daysUntil, formatDue, weekdayKo } from "@/lib/dates";
 import { ROLE_STYLE } from "@/lib/roles";
 import { UNASSIGNED } from "@/lib/team";
-import { Slot, Task } from "@/lib/types";
+import { BusyEvent, Slot, Task } from "@/lib/types";
 
 /** 화면에 펼쳐 두는 시간대. 그 밖은 접는다 — 새벽 칸은 늘 비어 자리만 먹는다. */
 const 시작시 = 9;
@@ -24,6 +24,12 @@ interface Props {
   onSelect: (id: string) => void;
   onSlotChange: (id: string, slot: Slot | null) => void;
   onOpenFlow: () => void;
+  /** 구글 캘린더의 다른 일정. 겹치지 않게 흐리게 깔아 둔다. */
+  busy?: BusyEvent[];
+  /** 주가 바뀌면 그 주의 일정을 다시 받아오게 한다. */
+  onRangeChange?: (from: string, to: string) => void;
+  googleConnected?: boolean;
+  onOpenSettings?: () => void;
 }
 
 /** 그 날짜가 속한 주의 월요일. 일요일은 그 주의 끝으로 본다. */
@@ -59,12 +65,22 @@ export default function WeekView({
   onSelect,
   onSlotChange,
   onOpenFlow,
+  busy = [],
+  onRangeChange,
+  googleConnected = false,
+  onOpenSettings,
 }: Props) {
   const [기준일, set기준일] = useState(() => 주의월요일(today));
   const [끄는중, set끄는중] = useState<string | null>(null);
 
   const 요일들 = Array.from({ length: 7 }, (_, i) => addDays(기준일, i));
   const 주끝 = 요일들[6];
+
+  // 주가 바뀔 때마다 구글 캘린더의 그 주 일정을 받아온다.
+  useEffect(() => {
+    onRangeChange?.(`${기준일}T00:00:00+09:00`, `${addDays(주끝, 1)}T00:00:00+09:00`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [기준일]);
 
   /*
    * 왼쪽에 남는 것과 격자에 올라가는 것을 가르는 기준은 slot 하나다.
@@ -138,6 +154,19 @@ export default function WeekView({
         <span className="text-[11px] text-ink-4">
           이번 주 잡힌 시간 <span className="num">{잡힌시간.toFixed(1)}</span>시간 ·
           기한 <span className="num">{이번주기한.length}</span>건
+        </span>
+        <span
+          className={`hidden items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10.5px] sm:flex ${
+            googleConnected ? "border-good-line bg-good-soft text-good" : "border-line bg-sunk text-ink-4"
+          }`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${googleConnected ? "bg-good" : "bg-ink-4"}`} />
+          {googleConnected ? "구글 캘린더와 양방향 동기화 중" : "구글 캘린더 미연결"}
+          {!googleConnected && onOpenSettings && (
+            <button type="button" onClick={onOpenSettings} className="ml-1 text-accent underline">
+              연결
+            </button>
+          )}
         </span>
         <button
           type="button"
@@ -260,6 +289,17 @@ export default function WeekView({
                   key={d}
                   className="flex min-h-[30px] flex-1 flex-col gap-0.5 border-l border-line-soft p-1"
                 >
+                  {busy
+                    .filter((b) => b.allDay && b.start <= d && b.end > d)
+                    .map((b) => (
+                      <span
+                        key={b.id}
+                        title={`${b.title} (구글 캘린더 · 종일)`}
+                        className="truncate rounded border border-dashed border-line-strong px-1.5 py-0.5 text-[10px] leading-tight text-ink-3"
+                      >
+                        {b.title}
+                      </span>
+                    ))}
                   {이번주기한
                     .filter((t) => t.dueDate === d)
                     .map((t) => {
@@ -318,6 +358,25 @@ export default function WeekView({
                       />
                     ))}
 
+                    {/* 구글 캘린더의 다른 일정. 끌어다 놓을 수 없고, 겹치면 안 된다는 신호만 준다. */}
+                    {busy
+                      .filter((b) => !b.allDay && isOnDate(b.start, d))
+                      .map((b) => {
+                        const 시작 = Math.max(시작시, 시각소수(b.start));
+                        const 끝 = Math.min(끝시, 시각소수(b.end));
+                        if (끝 <= 시작) return null;
+                        return (
+                          <div
+                            key={b.id}
+                            title={`${b.title} · ${clockKST(b.start)}–${clockKST(b.end)} (구글 캘린더)`}
+                            style={{ top: (시작 - 시작시) * ROW_H, height: Math.max((끝 - 시작) * ROW_H, 18) }}
+                            className="pointer-events-none absolute inset-x-1 overflow-hidden rounded border border-dashed border-line-strong bg-sunk/80 px-1.5 py-0.5"
+                          >
+                            <p className="truncate text-[10px] leading-tight text-ink-3">{b.title}</p>
+                          </div>
+                        );
+                      })}
+
                     {블록.map((t) => {
                       const s = t.slot as Slot;
                       const 시작 = 시각소수(s.start);
@@ -355,6 +414,7 @@ export default function WeekView({
 
           <p className="border-t border-line-soft px-3.5 py-2 text-[10px] text-ink-4">
             {시작시}:00–{끝시}:00 표시 · 그 밖의 시간은 접혀 있습니다
+            {googleConnected ? " · 점선 상자는 구글 캘린더의 다른 일정" : ""}
           </p>
         </section>
       </div>
