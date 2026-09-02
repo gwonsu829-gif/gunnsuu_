@@ -6,7 +6,9 @@ export interface Integrations {
   저장소: "redis" | "memory";
   메일: boolean;
   디스코드: boolean;
-  디스코드_채널: string[];
+  디스코드_채널?: string[];
+  디스코드_모드?: "all" | "picked" | "off";
+  디스코드_콕집기?: string | null;
   AI: boolean;
   AI_제공자?: "anthropic" | "gemini" | null;
   구글?: boolean;
@@ -136,13 +138,16 @@ export default function IntegrationStatus({
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch("/api/ingest/discord/run", { method: "POST" });
+      const res = await fetch("/api/discord/sync?force=1", { method: "POST" });
       const data = (await res.json()) as {
         error?: string;
+        건너뜀?: string;
+        대상채널?: number;
         채널별?: {
           채널: string;
           새_메시지: number;
           추가된_할일?: number;
+          콕집은_할일?: number;
           건너뜀?: string;
           오류?: string;
         }[];
@@ -151,15 +156,27 @@ export default function IntegrationStatus({
         setTestResult(data.error ?? "수집 실패");
         return;
       }
+      if (data.건너뜀) {
+        setTestResult(data.건너뜀);
+        return;
+      }
+      const 움직인것 = data.채널별.filter(
+        (c) => c.오류 || c.추가된_할일 || c.콕집은_할일 || c.새_메시지,
+      );
       setTestResult(
-        data.채널별
-          .map((c) => {
-            if (c.오류) return `${c.채널}: ${c.오류}`;
-            if (c.건너뜀) return `${c.채널}: ${c.건너뜀}`;
-            if (!c.새_메시지) return `${c.채널}: 새 메시지 없음`;
-            return `${c.채널}: 메시지 ${c.새_메시지}건 → 할일 ${c.추가된_할일 ?? 0}건`;
-          })
-          .join(" / "),
+        움직인것.length === 0
+          ? `채널 ${data.대상채널 ?? 0}곳을 봤지만 새 대화가 없습니다.`
+          : 움직인것
+              .map((c) => {
+                if (c.오류) return `${c.채널}: ${c.오류}`;
+                const 조각 = [];
+                if (c.새_메시지) 조각.push(`메시지 ${c.새_메시지}건`);
+                if (c.추가된_할일) 조각.push(`할일 ${c.추가된_할일}건`);
+                if (c.콕집은_할일) 조각.push(`콕집기 ${c.콕집은_할일}건`);
+                if (c.건너뜀) 조각.push(c.건너뜀);
+                return `${c.채널}: ${조각.join(" → ") || "변화 없음"}`;
+              })
+              .join(" / "),
       );
       onRefresh();
     } catch {
@@ -255,9 +272,15 @@ export default function IntegrationStatus({
           on={integrations.디스코드}
           label="디스코드"
           note={
-            integrations.디스코드_채널.length
-              ? integrations.디스코드_채널.join(", ")
-              : "DISCORD_BOT_TOKEN + DISCORD_CHANNELS"
+            integrations.디스코드
+              ? `${
+                  integrations.디스코드_모드 === "picked"
+                    ? "고른 채널"
+                    : integrations.디스코드_모드 === "off"
+                      ? "자동 수집 꺼짐"
+                      : "모든 채널"
+                }${integrations.디스코드_콕집기 ? ` · ${integrations.디스코드_콕집기} 콕집기` : ""}`
+              : "DISCORD_BOT_TOKEN이 없습니다"
           }
         />
         <Lamp
@@ -290,7 +313,7 @@ export default function IntegrationStatus({
           <Tool
             label="디스코드 지금 수집"
             busyLabel="수집 중"
-            desc="크론을 기다리지 않고 채널을 훑습니다"
+            desc="크론을 기다리지 않고 지금 훑습니다"
             onClick={() => void collectDiscord()}
             disabled={testing}
           />

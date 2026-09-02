@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 
-import { readBotToken, readChannelConfig } from "@/lib/discord";
+import { readBotToken } from "@/lib/discord";
 import { getStore } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -20,7 +20,6 @@ export async function GET(request: Request) {
   const key = raw.trim().replace(/^["']|["']$/g, "");
 
   const botToken = readBotToken();
-  const channels = readChannelConfig();
   const ingestSecret = (process.env.INGEST_SECRET ?? "").trim();
 
   const report: Record<string, unknown> = {
@@ -52,15 +51,11 @@ export async function GET(request: Request) {
     디스코드: {
       DISCORD_BOT_TOKEN_설정됨: botToken.length > 0,
       토큰_길이: botToken.length,
-      DISCORD_CHANNELS_원본: process.env.DISCORD_CHANNELS ?? null,
-      해석된_채널: channels,
-      수집_가능: botToken.length > 0 && channels.length > 0,
+      수집_가능: botToken.length > 0,
       안내:
         botToken.length === 0
           ? "DISCORD_BOT_TOKEN이 서버에 없습니다. 변수 추가 후 재배포했는지 확인하세요."
-          : channels.length === 0
-            ? "DISCORD_CHANNELS가 비어 있습니다. '채널ID:#이름' 형식인지 확인하세요."
-            : "설정 완료",
+          : "채널은 환경변수가 아니라 설정 화면에서 고릅니다. 설정 → 디스코드 → 서버 불러오기.",
     },
   };
 

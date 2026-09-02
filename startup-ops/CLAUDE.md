@@ -75,7 +75,7 @@ Discord (채널 + 스레드)   │        │                    │
 | `lib/suggest.ts` | 담당자 추천 |
 | `lib/stages.ts` | '흐름' 탭의 6단계 계산 |
 | `lib/digest.ts` | 아침 요약 본문 |
-| `lib/discord.ts` | 디스코드 API (스레드 포함) |
+| `lib/discord.ts` | 디스코드 API. 서버·채널 자동 조회, 반응 읽기, 스레드 |
 | `lib/store.ts` | Upstash Redis / 메모리 강등 |
 | `lib/eval.ts`, `lib/eval-set.ts` | 정확도 측정과 정답지 |
 | `docs/gmail-forwarder.gs` | Gmail Apps Script (구글 OAuth를 못 쓸 때의 대안) |
@@ -177,9 +177,32 @@ Apps Script가 라벨을 떼지 않게 한다.
 `lib/calendar.ts`. 되돌릴 때 이 속성이 없는 이벤트는 건드리지 않는다. 남의 회의가 할일이 되면 안 된다.
 syncToken 요청은 처음 요청과 같은 조건이어야 한다(구글 규칙) — `singleEvents`, `showDeleted`를 빼지 말 것.
 
-### 15. 팀 명단·규칙은 환경변수가 아니라 설정 화면이다
+### 15. 팀 명단·규칙·디스코드 채널은 환경변수가 아니라 설정 화면이다
 
 `lib/settings.ts`. 대표님이 화면에서 바로 바꿔야 하는 값을 재배포 뒤에 두면 결국 안 바꾼다.
+디스코드 채널 ID를 `DISCORD_CHANNELS`에 적던 것을 여기로 옮겼다 — 봇이 서버에 있으면
+채널 목록은 봇이 스스로 아는 정보라, 사람이 ID를 복사할 이유가 애초에 없었다.
+
+### 16. 디스코드 자동 수집의 기본은 "모든 채널"이다
+
+`lib/settings.ts`의 `DEFAULT_SETTINGS.discord.mode`. 고르게 만들면 새 프로젝트 채널이
+생길 때마다 누군가 설정을 열어야 하고, 그 한 번을 잊으면 그 채널의 할일이 통째로 사라진다.
+빼는 쪽이 훨씬 드물다. 못 읽는 채널은 403을 받은 뒤 일주일간 건너뛴다(`discord:blocked`) —
+"모든 채널" 모드에서는 서버의 모든 채널이 목록에 오므로, 기억하지 않으면 매 실행마다 같은 403을 받는다.
+
+### 17. 📌 반응은 커서로 못 잡는다. 최근 구간을 따로 훑는다
+
+`lib/discord-collect.ts`. 반응은 **지나간 메시지에도** 붙는다. `after` 커서로 읽으면
+새 메시지만 오므로 📌가 영영 안 보인다. 그래서 커서 조회와 별개로 최근 50건을 다시 훑는다.
+요청이 한 번 더 드는 건 알고 한 것이다 — 이 기능의 값어치가 "자동 수집이 놓친 걸 나중에 집어넣을 수 있다"에 있다.
+
+메시지 id 비교는 반드시 BigInt로 한다(`isNewerThan`). 문자열로 비교하면 자릿수가 바뀌는
+순간(`999...` → `1000...`) 새 메시지를 통째로 놓치는데, 화면에는 "새 메시지 없음"으로 보여 알아채기 어렵다.
+
+### 18. 콕 집은 원문에서는 빈 배열을 허용하지 않는다
+
+`lib/prompt.ts`의 `mustExtract`. 사람이 이미 "이건 할일이다"라고 표시한 것이라 판단은 끝났다.
+빈 배열이 나오면 그 표시가 무시된 셈이고, 사람은 자기가 콕 집은 것이 사라진 이유를 알 길이 없다.
 
 ---
 
@@ -188,6 +211,8 @@ syncToken 요청은 처음 요청과 같은 조건이어야 한다(구글 규칙
 | 증상 | 원인 |
 |---|---|
 | 계속 데모 모드 | `ANTHROPIC_API_KEY` 이름·값 확인. `/api/health`가 공백·따옴표까지 알려준다 |
+| 디스코드 본문이 빈 채로 옴 | 봇 설정의 Message Content Intent가 꺼져 있다 |
+| 📌를 눌러도 안 들어옴 | 설정의 이모지와 실제 반응이 다르거나, 그 메시지가 최근 50건 밖으로 밀려났다 |
 | Apps Script 401 | `INGEST_SECRET`이 양쪽에서 달라졌다 |
 | 값을 바꿨는데 반영 안 됨 | 재배포를 안 했다 |
 | 버튼이 안 눌림 (로컬) | 옛 빌드를 문 서버. 위의 "로컬에서 테스트할 때" 참고 |
@@ -212,9 +237,7 @@ GOOGLE_REDIRECT_URI    선택. 비우면 요청 도메인/api/google/callback
 GOOGLE_CALENDAR_ID     선택. 비우면 primary
 APP_PASSCODE           팀 접근코드. 없으면 잠그지 않는다 (배포에서는 꼭)
 INGEST_SECRET          웹훅·크론 비밀. 없으면 수집 엔드포인트가 닫힌다
-DISCORD_BOT_TOKEN
-DISCORD_CHANNELS       "채널ID:#이름, 채널ID:#이름"
-DISCORD_DIGEST_CHANNEL 선택. 없으면 첫 채널로 보낸다
+DISCORD_BOT_TOKEN      이것 하나면 된다. 채널·요약 채널·📌 이모지는 설정 화면에서 고른다
 KV_REST_API_URL        Upstash (Vercel 마켓플레이스 연동 시 자동)
 KV_REST_API_TOKEN
 CRON_SECRET            선택

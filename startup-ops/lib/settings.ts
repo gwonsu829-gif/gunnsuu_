@@ -1,4 +1,11 @@
-import { KeywordRule, MailLabel, Settings, TeamMember } from "./types";
+import {
+  DiscordChannelInfo,
+  DiscordSettings,
+  KeywordRule,
+  MailLabel,
+  Settings,
+  TeamMember,
+} from "./types";
 import { ROLES } from "./types";
 
 /**
@@ -34,7 +41,80 @@ export const DEFAULT_SETTINGS: Settings = {
   ],
   mailQuery: "newer_than:7d -category:promotions -category:social -in:spam -in:trash",
   labelPrefix: "업무",
+  /*
+   * 기본은 "봇이 읽을 수 있는 모든 채널".
+   *
+   * 앰플랩 서버는 채널이 프로젝트·고객사 단위(ai-os, 판틀110)라 거의 전부가 업무 대화다.
+   * 고르게 만들면 새 프로젝트 채널이 생길 때마다 누군가 설정을 열어야 하는데,
+   * 그 한 번을 잊으면 그 채널의 할일은 통째로 사라진다. 빼는 쪽이 훨씬 드물다.
+   */
+  discord: {
+    mode: "all",
+    guildId: "",
+    channels: [],
+    excluded: [],
+    pinEmoji: "📌",
+    digestChannel: "",
+    knownChannels: [],
+  },
 };
+
+const MAX_CHANNELS = 100;
+
+function cleanIdList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const x of v) {
+    const s = typeof x === "string" ? x.trim() : "";
+    // 디스코드 id는 숫자(snowflake)다. 다른 게 들어오면 설정 실수다.
+    if (/^\d{5,25}$/.test(s) && !out.includes(s)) out.push(s);
+    if (out.length >= MAX_CHANNELS) break;
+  }
+  return out;
+}
+
+function normalizeDiscord(raw: unknown): DiscordSettings {
+  const d = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  const mode =
+    d.mode === "picked" || d.mode === "off" || d.mode === "all"
+      ? (d.mode as DiscordSettings["mode"])
+      : DEFAULT_SETTINGS.discord.mode;
+
+  const knownChannels: DiscordChannelInfo[] = [];
+  if (Array.isArray(d.knownChannels)) {
+    for (const c of d.knownChannels.slice(0, MAX_CHANNELS)) {
+      const cc = (typeof c === "object" && c !== null ? c : {}) as Record<string, unknown>;
+      const id = typeof cc.id === "string" ? cc.id.trim() : "";
+      if (!/^\d{5,25}$/.test(id)) continue;
+      knownChannels.push({
+        id,
+        name: cleanString(cc.name, 100) || id,
+        category: cleanString(cc.category, 100),
+        type: typeof cc.type === "number" ? cc.type : 0,
+      });
+    }
+  }
+
+  /*
+   * 이모지는 한두 글자만 받는다. 긴 문자열이 들어오면 반응 비교가 절대 안 맞아
+   * "왜 📌를 눌러도 안 들어오지"로 시간을 버리게 된다.
+   */
+  const pinRaw = typeof d.pinEmoji === "string" ? d.pinEmoji.trim() : DEFAULT_SETTINGS.discord.pinEmoji;
+  const pinEmoji = Array.from(pinRaw).slice(0, 4).join("");
+
+  const digest = typeof d.digestChannel === "string" ? d.digestChannel.trim() : "";
+  const guild = typeof d.guildId === "string" ? d.guildId.trim() : "";
+
+  return {
+    mode,
+    guildId: /^\d{5,25}$/.test(guild) ? guild : "",
+    channels: cleanIdList(d.channels),
+    excluded: cleanIdList(d.excluded),
+    pinEmoji,
+    digestChannel: /^\d{5,25}$/.test(digest) ? digest : "",
+    knownChannels,
+  };
+}
 
 const MAX_TEAM = 8;
 const MAX_RULES = 40;
@@ -89,6 +169,7 @@ export function normalizeSettings(raw: unknown): Settings {
     keywordRules,
     mailQuery: cleanString(r.mailQuery, 300) || DEFAULT_SETTINGS.mailQuery,
     labelPrefix: cleanString(r.labelPrefix, 20).replace(/\//g, "") || DEFAULT_SETTINGS.labelPrefix,
+    discord: normalizeDiscord(r.discord),
   };
 }
 

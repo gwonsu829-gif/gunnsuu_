@@ -11,6 +11,11 @@ export interface IngestInput {
   /** 메시지 ID나 메일 ID. 같은 걸 두 번 처리하지 않기 위한 키. */
   sourceRef?: string;
   receivedAt?: string;
+  /**
+   * 사람이 이미 "이건 할일이다"라고 표시한 원문 (디스코드 📌).
+   * 모델이 빈 배열을 돌려주지 않게 한다.
+   */
+  mustExtract?: boolean;
 }
 
 export interface IngestResult {
@@ -59,7 +64,9 @@ export async function ingestText(input: IngestInput): Promise<IngestResult> {
   }
 
   const today = todayISO();
-  const outcome = await runExtraction(text, today);
+  const outcome = await runExtraction(text, today, undefined, {
+    mustExtract: input.mustExtract,
+  });
 
   /*
    * 자동 수집에서는 폴백 결과를 저장하지 않는다.

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { recordAudit, whoFrom } from "@/lib/audit";
 import { calendarConnected, pushSlot, removeEvent } from "@/lib/calendar";
-import { readChannelConfig, readBotToken } from "@/lib/discord";
+import { readBotToken } from "@/lib/discord";
 import { pickProvider } from "@/lib/extract";
 import { googleStatus } from "@/lib/google";
 import { readSlot } from "@/lib/slot";
@@ -30,8 +30,14 @@ export async function GET() {
     연동: {
       저장소: store.kind,
       메일: Boolean((process.env.INGEST_SECRET ?? "").trim()),
-      디스코드: Boolean(readBotToken()) && readChannelConfig().length > 0,
-      디스코드_채널: readChannelConfig().map((c) => c.label),
+      /*
+       * 채널 목록은 여기서 조회하지 않는다. 이 경로는 30초마다 불리는데
+       * 그때마다 디스코드 API를 때리면 목록 조회만으로 하루 2천 번이 넘는다.
+       * 화면에 필요한 건 "봇이 있느냐"뿐이고, 실제 채널은 설정 화면에서 부른다.
+       */
+      디스코드: Boolean(readBotToken()),
+      디스코드_모드: settings.discord.mode,
+      디스코드_콕집기: settings.discord.pinEmoji || null,
       AI: pickProvider() !== null,
       AI_제공자: pickProvider(),
       구글: google.connected,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import DiscordSection from "./DiscordSettings";
 import IntegrationStatus, { Integrations } from "./IntegrationStatus";
 import { IconCheck, IconGoogle, IconPlus, IconX } from "./Icons";
 import { Avatar } from "./AppShell";
@@ -36,7 +37,7 @@ interface Props {
 /**
  * 설정.
  *
- * 순서가 곧 설치 순서다: 구글 연결 → AI → 팀 명단 → 키워드 규칙 → 고급.
+ * 순서가 곧 설치 순서다: 구글 연결 → AI → 디스코드 → 팀 명단 → 키워드 규칙 → 고급.
  * 처음 세팅하는 사람이 위에서 아래로 내려오면 끝나게 두었다.
  */
 export default function SettingsView({
@@ -186,7 +187,14 @@ export default function SettingsView({
         </div>
       </section>
 
-      {/* ---------- 3. 팀 ---------- */}
+      {/* ---------- 3. 디스코드 ---------- */}
+      <DiscordSection
+        value={draft.discord}
+        onChange={(discord) => edit((s) => ({ ...s, discord }))}
+        botConfigured={Boolean(integrations?.디스코드)}
+      />
+
+      {/* ---------- 4. 팀 ---------- */}
       <section className="card p-5">
         <div className="flex items-baseline justify-between">
           <h2 className="text-[14px] font-semibold text-ink">팀 명단</h2>
@@ -253,7 +261,7 @@ export default function SettingsView({
         </label>
       </section>
 
-      {/* ---------- 4. 키워드 규칙 ---------- */}
+      {/* ---------- 5. 키워드 규칙 ---------- */}
       <section className="card p-5">
         <div className="flex items-baseline justify-between">
           <h2 className="text-[14px] font-semibold text-ink">키워드 규칙</h2>
@@ -336,7 +344,7 @@ export default function SettingsView({
         </div>
       </section>
 
-      {/* ---------- 5. 접근·저장소 ---------- */}
+      {/* ---------- 6. 접근·저장소 ---------- */}
       <section className="card p-5">
         <h2 className="text-[14px] font-semibold text-ink">접근과 저장소</h2>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -353,7 +361,7 @@ export default function SettingsView({
         </div>
       </section>
 
-      {/* ---------- 6. 고급 ---------- */}
+      {/* ---------- 7. 고급 ---------- */}
       <section className="card p-5">
         <button
           type="button"
@@ -362,7 +370,7 @@ export default function SettingsView({
         >
           <span>
             <span className="text-[14px] font-semibold text-ink">고급 연동</span>
-            <span className="ml-2 text-[12px] text-ink-4">디스코드 수집 · 메일 웹훅 · 아침 요약 · 정확도 측정</span>
+            <span className="ml-2 text-[12px] text-ink-4">지금 수집 · 메일 웹훅 · 아침 요약 · 정확도 측정</span>
           </span>
           <span className="text-[12px] text-ink-3">{advanced ? "접기" : "펼치기"}</span>
         </button>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { todayISO } from "@/lib/dates";
 import { buildDigest } from "@/lib/digest";
-import { readBotToken, readDigestChannelId, sendMessage } from "@/lib/discord";
+import { readBotToken, resolveDigestChannel, sendMessage } from "@/lib/discord";
 import { getStore } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -34,10 +34,10 @@ export async function POST(request: Request) {
   }
 
   const token = readBotToken();
-  const channelId = readDigestChannelId();
+  const channelId = token ? await resolveDigestChannel(token, await getStore().getSettings()) : null;
   if (!token || !channelId) {
     return NextResponse.json(
-      { error: "디스코드 봇 토큰이나 보낼 채널이 없습니다.", 본문: digest.text },
+      { error: "디스코드 봇 토큰이 없거나, 설정에서 보낼 채널을 정하지 않았습니다.", 본문: digest.text },
       { status: 503 },
     );
   }

@@ -42,13 +42,17 @@ export function pickProvider(): Provider | null {
   return null;
 }
 
-async function callAnthropic(text: string, today: string): Promise<string> {
+async function callAnthropic(
+  text: string,
+  today: string,
+  mustExtract: boolean,
+): Promise<string> {
   const client = new Anthropic({ apiKey: readApiKey() });
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 8000,
     system: buildSystemPrompt(today),
-    messages: [{ role: "user", content: buildUserPrompt(text) }],
+    messages: [{ role: "user", content: buildUserPrompt(text, mustExtract) }],
     output_config: { effort: "medium" },
   });
   return response.content
@@ -63,11 +67,14 @@ async function callAnthropic(text: string, today: string): Promise<string> {
  *
  * onFallback: 샘플처럼 미리 정의된 결과가 있으면 그걸 쓰기 위한 후크.
  *             없으면 원문 기반 최소 추출기로 떨어진다.
+ * mustExtract: 사람이 이미 "할일이다"라고 표시한 원문 (디스코드 📌).
+ *              빈 배열을 돌려주면 안 된다.
  */
 export async function runExtraction(
   text: string,
   today: string,
   onFallback?: () => ExtractedTask[] | null,
+  opts: { mustExtract?: boolean } = {},
 ): Promise<ExtractOutcome> {
   const fallback = (reason: string): ExtractOutcome => ({
     tasks: onFallback?.() ?? heuristicExtract(text, today),
@@ -81,10 +88,11 @@ export async function runExtraction(
   }
 
   try {
+    const mustExtract = opts.mustExtract === true;
     const raw =
       provider === "anthropic"
-        ? await callAnthropic(text, today)
-        : await geminiJson(buildSystemPrompt(today), buildUserPrompt(text), {
+        ? await callAnthropic(text, today, mustExtract)
+        : await geminiJson(buildSystemPrompt(today), buildUserPrompt(text, mustExtract), {
             maxOutputTokens: 8000,
           });
 

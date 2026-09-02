@@ -133,6 +133,7 @@ export default function Dashboard({ initialTab, googleNotice }: Props) {
   );
 
   const googleConnected = Boolean(integrations?.구글);
+  const discordConnected = Boolean(integrations?.디스코드);
 
   /* ---------- 서버에서 불러오기 ---------- */
   const loadServerTasks = useCallback(async () => {
@@ -210,6 +211,35 @@ export default function Dashboard({ initialTab, googleNotice }: Props) {
   }, []);
 
   /**
+   * 디스코드 수집. 서버가 5분 문턱을 지키므로 자주 불러도 실제로는 5분에 한 번만 돈다.
+   * 새 대화가 없으면 AI를 부르지 않으므로 비용도 그때만 든다.
+   */
+  const pullDiscord = useCallback(async () => {
+    if (!discordConnected) return;
+    try {
+      const res = await fetch("/api/discord/sync", { method: "POST" });
+      const r = (await res.json()) as {
+        건너뜀?: string;
+        채널별?: { 추가된_할일?: number; 콕집은_할일?: number }[];
+      };
+      if (!res.ok || r.건너뜀 || !r.채널별?.length) return;
+      const 자동 = r.채널별.reduce((n, c) => n + (c.추가된_할일 ?? 0), 0);
+      const 콕 = r.채널별.reduce((n, c) => n + (c.콕집은_할일 ?? 0), 0);
+      if (자동 + 콕 > 0) {
+        await Promise.all([loadServerTasks(), loadAudit()]);
+        toast(
+          "info",
+          콕 > 0
+            ? `디스코드에서 할일 ${자동 + 콕}건 (그중 ${콕}건은 반응으로 콕 집은 것).`
+            : `디스코드에서 할일 ${자동}건이 새로 들어왔습니다.`,
+        );
+      }
+    } catch {
+      // 수집이 안 돼도 나머지 화면은 돌아야 한다.
+    }
+  }, [discordConnected, loadServerTasks, loadAudit, toast]);
+
+  /**
    * 구글 쪽 변화를 끌어온다. 서버가 5분 문턱을 지키므로 자주 불러도 비용이 안 든다.
    * 캘린더는 syncToken이라 가볍다.
    */
@@ -256,6 +286,13 @@ export default function Dashboard({ initialTab, googleNotice }: Props) {
     }, 60_000);
     return () => window.clearInterval(timer);
   }, [googleConnected, pullGoogle, loadMails, loadBusy]);
+
+  useEffect(() => {
+    if (!discordConnected) return;
+    void pullDiscord();
+    const timer = window.setInterval(() => void pullDiscord(), 60_000);
+    return () => window.clearInterval(timer);
+  }, [discordConnected, pullDiscord]);
 
   useEffect(() => {
     if (googleNotice) toast(googleNotice.startsWith("구글 계정이 연결") ? "good" : "warn", googleNotice);
@@ -516,6 +553,16 @@ export default function Dashboard({ initialTab, googleNotice }: Props) {
         ? { label: "구글 연결됨", tone: "good", onClick: () => setTab("settings") }
         : { label: "구글 미연결", tone: "warn", onClick: () => setTab("settings") },
     );
+    if (integrations.디스코드) {
+      chips.push({
+        label:
+          integrations.디스코드_모드 === "off"
+            ? "디스코드 📌만"
+            : `디스코드 ${integrations.디스코드_모드 === "picked" ? "고른 채널" : "전체"}`,
+        tone: "good",
+        onClick: () => setTab("settings"),
+      });
+    }
     if (integrations.저장소 !== "redis") chips.push({ label: "저장소 없음", tone: "warn", onClick: () => setTab("settings") });
     if (demo) chips.push({ label: `데모 모드${demoReason ? ` · ${demoReason}` : ""}`, tone: "warn" });
   }

@@ -143,6 +143,51 @@ export interface KeywordRule {
   keywords: string[];
 }
 
+/**
+ * 디스코드 수집 설정.
+ *
+ * 채널 ID를 환경변수에 적던 것을 여기로 옮겼다. 봇이 이미 서버에 들어가 있으면
+ * 채널 목록은 봇이 스스로 알 수 있어서, 사람이 ID를 복사해 넣고 재배포할 이유가 없다.
+ */
+export interface DiscordSettings {
+  /**
+   * 자동 수집 범위.
+   *  all    — 봇이 읽을 수 있는 모든 채널 (제외 목록만 관리). 새 채널이 생겨도 저절로 잡힌다
+   *  picked — 고른 채널만
+   *  off    — 자동 수집 안 함 (📌로 콕 집은 것만 들어온다)
+   */
+  mode: "all" | "picked" | "off";
+  /** 봇이 여러 서버에 있을 때 쓸 서버. 비우면 첫 번째 서버. */
+  guildId: string;
+  /** mode가 picked일 때 대상 채널 */
+  channels: string[];
+  /** mode가 all일 때 뺄 채널 */
+  excluded: string[];
+  /**
+   * 이 이모지를 메시지에 붙이면 AI 판단과 무관하게 할일이 된다.
+   * 비우면 이 기능을 끈다.
+   */
+  pinEmoji: string;
+  /** 아침 요약을 보낼 채널. 비우면 대상 채널 중 첫 번째. */
+  digestChannel: string;
+  /** 화면이 이름을 바로 보여주기 위한 캐시. 수집은 매번 실제 목록을 다시 읽는다. */
+  knownChannels: DiscordChannelInfo[];
+}
+
+export interface DiscordChannelInfo {
+  id: string;
+  name: string;
+  /** 카테고리 이름 (없으면 빈 문자열) */
+  category: string;
+  /** 0=텍스트, 5=공지, 15=포럼 */
+  type: number;
+}
+
+export interface DiscordGuildInfo {
+  id: string;
+  name: string;
+}
+
 export interface Settings {
   team: TeamMember[];
   keywordRules: KeywordRule[];
@@ -152,6 +197,7 @@ export interface Settings {
   labelPrefix: string;
   /** 회사 이름 (인사말·요약에 쓴다) */
   companyName: string;
+  discord: DiscordSettings;
 }
 
 /* ---------- 활동 이력 ---------- */
