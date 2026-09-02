@@ -6,6 +6,7 @@ import { normalizeTasks } from "./parse";
 import { MAIL_LABELS, applyKeywordRules, gmailLabelName } from "./settings";
 import { getStore } from "./store";
 import { MailLabel, MailRecord, PRIORITIES, ROLES, Settings } from "./types";
+import { checkQuota, recordCall } from "./usage";
 
 /**
  * Gmail → 라벨 → 할일.
@@ -19,8 +20,8 @@ import { MailLabel, MailRecord, PRIORITIES, ROLES, Settings } from "./types";
 
 const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
 const LAST_SYNC_KEY = "mail:lastSync";
-/** 화면이 열려 있을 때 자동으로 도는 최소 간격. Gmail 할당량과 Gemini 비용을 지키는 선. */
-export const AUTO_SYNC_INTERVAL_MS = 5 * 60_000;
+/** 설정의 간격을 못 읽었을 때 쓸 기본값(분). 평소에는 settings.syncMinutes를 쓴다. */
+const FALLBACK_SYNC_MINUTES = 10;
 /** 한 번에 처리할 최대 통수. 서버리스 실행 시간 안에 끝나야 한다. */
 const MAX_PER_RUN = 20;
 const MAX_BODY_CHARS = 6000;
@@ -35,6 +36,8 @@ export interface MailSyncReport {
   labeled: number;
   failed: { id: string; subject: string; reason: string }[];
   at: string;
+  /** 오늘 AI를 몇 번 썼는지 / 상한 (0이면 상한 없음) */
+  사용량?: { 오늘: number; 상한: number };
 }
 
 /* ---------------- Gmail 읽기 ---------------- */
@@ -240,17 +243,24 @@ export async function syncMail(opts: { force?: boolean } = {}): Promise<MailSync
 
   if (!(await getConnection())) return empty("구글 계정이 연결되어 있지 않습니다.");
 
+  const settingsForGuard = await store.getSettings();
   if (!opts.force) {
     const last = await lastSyncAt();
-    if (last && Date.now() - Date.parse(last) < AUTO_SYNC_INTERVAL_MS) {
+    const 간격 = (settingsForGuard.syncMinutes || FALLBACK_SYNC_MINUTES) * 60_000;
+    if (last && Date.now() - Date.parse(last) < 간격) {
       return empty("최근에 동기화했습니다.");
     }
   }
   // 두 브라우저가 동시에 부르면 같은 메일을 두 번 분류한다. 먼저 찍은 쪽만 돈다.
   await store.setJSON(LAST_SYNC_KEY, { at });
 
-  const settings = await store.getSettings();
+  const settings = settingsForGuard;
   const today = todayISO();
+  /*
+   * 메일 한 통마다 Gemini를 한 번 부른다. 상한에 닿으면 남은 메일은 처리 표시를 남기지 않고
+   * 넘어가 다음 실행에서 다시 읽힌다 — 분류가 밀릴 뿐 메일이 사라지지는 않는다.
+   */
+  let quota = await checkQuota(settings.aiDailyLimit);
   const report: MailSyncReport = {
     ok: true,
     fetched: 0,
@@ -277,6 +287,14 @@ export async function syncMail(opts: { force?: boolean } = {}): Promise<MailSync
 
   for (const { id } of ids) {
     if (fresh.length >= MAX_PER_RUN) break;
+    if (quota.exhausted) {
+      report.failed.push({
+        id,
+        subject: "",
+        reason: `오늘 AI 호출 상한(${quota.limit}회)에 닿아 다음에 이어서 읽습니다`,
+      });
+      break;
+    }
     // 이미 본 메일은 건너뛴다. (라벨을 고친 뒤 다시 읽어도 사람이 고친 값이 덮이지 않게.)
     if (!(await store.markIfUnseen(`gmail:${id}`))) continue;
 
@@ -305,6 +323,8 @@ export async function syncMail(opts: { force?: boolean } = {}): Promise<MailSync
     // 2) Gemini.
     let classified: Classified;
     try {
+      await recordCall("collect");
+      quota = await checkQuota(settings.aiDailyLimit);
       const raw = await geminiJson(
         classifyPrompt(today),
         `보낸사람: ${from}\n제목: ${subject}\n\n${body || msg.snippet || ""}`,
@@ -379,6 +399,7 @@ export async function syncMail(opts: { force?: boolean } = {}): Promise<MailSync
   }
 
   await store.upsertMails(fresh);
+  report.사용량 = { 오늘: quota.used, 상한: quota.limit };
   return report;
 }
 

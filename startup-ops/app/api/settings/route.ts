@@ -6,19 +6,26 @@ import { googleStatus, redirectUri } from "@/lib/google";
 import { readGeminiKey, geminiModel } from "@/lib/gemini";
 import { normalizeSettings } from "@/lib/settings";
 import { getStore } from "@/lib/store";
+import { readRecent, readUsage } from "@/lib/usage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const store = getStore();
-  const [settings, google] = await Promise.all([store.getSettings(), googleStatus()]);
+  const [settings, google, usage, recent] = await Promise.all([
+    store.getSettings(),
+    googleStatus(),
+    readUsage(),
+    readRecent(7),
+  ]);
   return NextResponse.json({
     settings,
     google: { ...google, redirectUri: redirectUri(request.url) },
     gemini: { configured: Boolean(readGeminiKey()), model: geminiModel() },
     passcode: authEnabled(),
     storage: store.kind,
+    usage: { today: usage, recent },
   });
 }
 

@@ -5,6 +5,7 @@ import { GeminiError, geminiJson, readGeminiKey } from "./gemini";
 import { extractJsonArray, normalizeTasks } from "./parse";
 import { buildSystemPrompt, buildUserPrompt } from "./prompt";
 import { ExtractedTask } from "./types";
+import { CallKind, recordCall } from "./usage";
 
 export const MODEL = "claude-sonnet-5";
 
@@ -69,12 +70,13 @@ async function callAnthropic(
  *             없으면 원문 기반 최소 추출기로 떨어진다.
  * mustExtract: 사람이 이미 "할일이다"라고 표시한 원문 (디스코드 📌).
  *              빈 배열을 돌려주면 안 된다.
+ * kind:        사용량을 어느 칸에 셀지. 상한은 collect에만 걸린다 (lib/usage.ts).
  */
 export async function runExtraction(
   text: string,
   today: string,
   onFallback?: () => ExtractedTask[] | null,
-  opts: { mustExtract?: boolean } = {},
+  opts: { mustExtract?: boolean; kind?: CallKind } = {},
 ): Promise<ExtractOutcome> {
   const fallback = (reason: string): ExtractOutcome => ({
     tasks: onFallback?.() ?? heuristicExtract(text, today),
@@ -89,6 +91,11 @@ export async function runExtraction(
 
   try {
     const mustExtract = opts.mustExtract === true;
+    /*
+     * 요청을 보내기 직전에 센다. 실패해도 요금과 무료 등급 한도는 요청 수로 깎이므로,
+     * 성공한 뒤에 세면 화면 숫자가 실제보다 작아 사람을 안심시킨다.
+     */
+    await recordCall(opts.kind ?? "manual");
     const raw =
       provider === "anthropic"
         ? await callAnthropic(text, today, mustExtract)

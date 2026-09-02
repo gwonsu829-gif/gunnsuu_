@@ -563,6 +563,19 @@ export default function Dashboard({ initialTab, googleNotice }: Props) {
         onClick: () => setTab("settings"),
       });
     }
+    /*
+     * 상한에 가까워지면 알려 준다. 다 쓴 뒤에 "왜 안 들어오지"로 헤매는 것보다
+     * 미리 보이는 편이 낫다. 여유가 있을 때는 굳이 띄우지 않는다.
+     */
+    const 상한 = integrations.AI_상한 ?? 0;
+    const 오늘 = integrations.AI_오늘 ?? 0;
+    if (상한 > 0 && 오늘 >= 상한 * 0.8) {
+      chips.push({
+        label: 오늘 >= 상한 ? `AI 상한 도달 ${오늘}/${상한}` : `AI ${오늘}/${상한}`,
+        tone: "warn",
+        onClick: () => setTab("settings"),
+      });
+    }
     if (integrations.저장소 !== "redis") chips.push({ label: "저장소 없음", tone: "warn", onClick: () => setTab("settings") });
     if (demo) chips.push({ label: `데모 모드${demoReason ? ` · ${demoReason}` : ""}`, tone: "warn" });
   }

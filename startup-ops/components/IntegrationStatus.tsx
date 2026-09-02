@@ -10,6 +10,8 @@ export interface Integrations {
   디스코드_모드?: "all" | "picked" | "off";
   디스코드_콕집기?: string | null;
   AI: boolean;
+  AI_오늘?: number;
+  AI_상한?: number;
   AI_제공자?: "anthropic" | "gemini" | null;
   구글?: boolean;
   구글_계정?: string | null;

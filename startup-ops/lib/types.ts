@@ -198,6 +198,13 @@ export interface Settings {
   /** 회사 이름 (인사말·요약에 쓴다) */
   companyName: string;
   discord: DiscordSettings;
+  /**
+   * 하루에 자동 수집이 쓸 수 있는 AI 호출 수. 0이면 상한 없음.
+   * 무료 등급 한도를 넘지 않게 하려고 둔다. 닿으면 수집이 멈추고 다음 날 이어서 읽는다.
+   */
+  aiDailyLimit: number;
+  /** 화면이 열려 있을 때 자동 수집이 도는 최소 간격(분). 짧을수록 호출이 는다. */
+  syncMinutes: number;
 }
 
 /* ---------- 활동 이력 ---------- */

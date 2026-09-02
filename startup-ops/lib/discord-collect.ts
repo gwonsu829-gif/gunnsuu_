@@ -15,11 +15,16 @@ import {
 import { ingestText } from "./ingest";
 import { getStore } from "./store";
 import { DiscordChannelInfo } from "./types";
+import { checkQuota } from "./usage";
 
-/** 대화가 이만큼도 안 쌓였으면 다음 차례를 기다린다 (토막난 맥락으로 뽑지 않기 위해). */
-const MIN_MESSAGES = 2;
-/** 화면이 열려 있을 때 자동으로 도는 최소 간격. */
-export const AUTO_SYNC_INTERVAL_MS = 5 * 60_000;
+/**
+ * 대화가 이만큼도 안 쌓였으면 다음 차례를 기다린다.
+ *
+ * 맥락 때문이기도 하고 비용 때문이기도 하다. 사람은 말을 한 줄씩 나눠 보내는데
+ * 그때마다 AI를 부르면 한 대화에 대여섯 번을 부른다. 조금 기다렸다 묶어 부르면
+ * 결과는 더 낫고 호출은 확 준다.
+ */
+const MIN_MESSAGES = 3;
 /** 📌를 찾을 때 훑는 최근 메시지 수. 반응은 지나간 메시지에도 붙으므로 커서로는 못 잡는다. */
 const PIN_SCAN_LIMIT = 50;
 /** 📌 앞에 이만큼을 맥락으로 붙인다. "그거 해주세요"만 있으면 무슨 일인지 모른다. */
@@ -51,6 +56,7 @@ export type CollectOutcome =
       콕집기: string | null;
       채널별: ChannelReport[];
       건너뜀?: string;
+      사용량?: { 오늘: number; 상한: number };
     };
 
 type Blocked = Record<string, string>;
@@ -82,7 +88,8 @@ export async function collectDiscord(
 
   if (!opts.force) {
     const last = await store.getJSON<{ at: string }>(LAST_SYNC_KEY);
-    if (last && Date.now() - Date.parse(last.at) < AUTO_SYNC_INTERVAL_MS) {
+    const 간격 = (await store.getSettings()).syncMinutes * 60_000;
+    if (last && Date.now() - Date.parse(last.at) < 간격) {
       return {
         저장소: store.kind,
         대상채널: 0,
@@ -99,6 +106,11 @@ export async function collectDiscord(
   const settings = await store.getSettings();
   const pin = settings.discord.pinEmoji;
   const reports: ChannelReport[] = [];
+  /*
+   * 오늘 쓸 수 있는 AI 호출이 남았는지. 상한에 닿으면 자동 수집은 멈추지만
+   * 📌로 콕 집은 것은 계속 받는다 — 사람이 확정한 것까지 막으면 그건 고장이다.
+   */
+  let quota = await checkQuota(settings.aiDailyLimit);
 
   let guildId: string;
   let channels: DiscordChannelInfo[];
@@ -196,8 +208,10 @@ export async function collectDiscord(
             sourceRef: `pin:${m.id}`,
             receivedAt: m.timestamp,
             mustExtract: true,
+            kind: "pin",
           });
           if (!result.skipped) pinned += result.added;
+          quota = await checkQuota(settings.aiDailyLimit);
         }
         if (pinned) report.콕집은_할일 = pinned;
       }
@@ -218,8 +232,23 @@ export async function collectDiscord(
       // 어디까지 읽었는지는 추출 성공 여부와 무관하게 먼저 정해 둔다.
       const newest = fresh[fresh.length - 1].id;
 
-      if (fresh.length < MIN_MESSAGES && !after) {
-        report.건너뜀 = "대화가 더 쌓이면 처리";
+      /*
+       * 문턱을 첫 실행뿐 아니라 늘 적용한다.
+       * 한 줄 올라올 때마다 부르면 한 대화에 대여섯 번을 부르게 되고, 그게 요금의 대부분이다.
+       * 커서를 옮기지 않으므로 다음 차례에 묶여서 함께 읽힌다.
+       */
+      if (fresh.length < MIN_MESSAGES) {
+        report.건너뜀 = `대화가 ${MIN_MESSAGES}건 이상 쌓이면 처리`;
+        reports.push(report);
+        continue;
+      }
+
+      /*
+       * 오늘 상한에 닿았다. 커서를 옮기지 않고 넘어가면 내일 그대로 이어서 읽는다.
+       * 사라지는 할일은 없고 미뤄질 뿐이다.
+       */
+      if (quota.exhausted) {
+        report.건너뜀 = `오늘 AI 호출 상한(${quota.limit}회)에 닿아 내일 이어서 읽습니다`;
         reports.push(report);
         continue;
       }
@@ -237,6 +266,7 @@ export async function collectDiscord(
         await store.setCursor(cursorKey, newest);
       }
 
+      quota = await checkQuota(settings.aiDailyLimit);
       report.추가된_할일 = result.added;
       report.중복_의심 = result.duplicates;
       report.건너뜀 = result.skipReason;
@@ -267,6 +297,7 @@ export async function collectDiscord(
     모드: settings.discord.mode,
     콕집기: pin || null,
     채널별: reports,
+    사용량: { 오늘: quota.used, 상한: quota.limit },
   };
 }
 

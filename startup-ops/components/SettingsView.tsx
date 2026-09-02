@@ -21,6 +21,10 @@ export interface SettingsInfo {
   gemini: { configured: boolean; model: string };
   passcode: boolean;
   storage: "redis" | "memory";
+  usage?: {
+    today: { calls: number; collect: number; pin: number; manual: number };
+    recent: { day: string; usage: { calls: number } }[];
+  };
 }
 
 interface Props {
@@ -37,7 +41,7 @@ interface Props {
 /**
  * 설정.
  *
- * 순서가 곧 설치 순서다: 구글 연결 → AI → 디스코드 → 팀 명단 → 키워드 규칙 → 고급.
+ * 순서가 곧 설치 순서다: 구글 연결 → AI → 사용량 → 디스코드 → 팀 명단 → 키워드 규칙 → 고급.
  * 처음 세팅하는 사람이 위에서 아래로 내려오면 끝나게 두었다.
  */
 export default function SettingsView({
@@ -187,14 +191,123 @@ export default function SettingsView({
         </div>
       </section>
 
-      {/* ---------- 3. 디스코드 ---------- */}
+      {/* ---------- 3. 사용량과 상한 ---------- */}
+      <section className="card p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-[14px] font-semibold text-ink">AI 사용량과 상한</h2>
+          <p className="text-[11.5px] text-ink-4">요금이 새어 나가지 않게 하는 곳</p>
+        </div>
+
+        {(() => {
+          const today = info.usage?.today.calls ?? 0;
+          const limit = draft.aiDailyLimit;
+          const ratio = limit > 0 ? Math.min(1, today / limit) : 0;
+          const tone = ratio >= 1 ? "#c2372f" : ratio >= 0.8 ? "#9a6200" : "#1a8a53";
+          return (
+            <>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="num text-[26px] font-semibold leading-none tracking-[-0.02em] text-ink">
+                  {today}
+                </span>
+                <span className="text-[12px] text-ink-3">
+                  {limit > 0 ? `/ ${limit}회 · 오늘 자동 수집이 쓴 AI 호출` : "회 · 오늘 쓴 AI 호출 (상한 없음)"}
+                </span>
+              </div>
+              {limit > 0 && (
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sunk">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${ratio * 100}%`, backgroundColor: tone }}
+                  />
+                </div>
+              )}
+              {info.usage && (
+                <p className="mt-1.5 text-[11px] text-ink-4">
+                  수집 {info.usage.today.collect} · 콕집기 {info.usage.today.pin} · 붙여넣기{" "}
+                  {info.usage.today.manual}
+                  {info.usage.recent.length > 1 && (
+                    <>
+                      {" · "}지난 7일 합계{" "}
+                      <span className="num">
+                        {info.usage.recent.reduce((n, d) => n + d.usage.calls, 0)}
+                      </span>
+                    </>
+                  )}
+                </p>
+              )}
+            </>
+          );
+        })()}
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-[12px] font-medium text-ink-2">하루 상한 (회)</span>
+            <input
+              type="number"
+              min={0}
+              max={5000}
+              value={draft.aiDailyLimit}
+              onChange={(e) => edit((s) => ({ ...s, aiDailyLimit: Number(e.target.value) }))}
+              className="num mt-1 w-full rounded-md border border-line px-2.5 py-1.5 text-[13px] focus:border-accent focus:outline-none"
+            />
+            <span className="mt-1 block text-[11px] leading-snug text-ink-4">
+              닿으면 자동 수집이 멈추고 <b>다음 날 이어서</b> 읽습니다. 원문은 그대로 남아 사라지는 할일이
+              없습니다. 📌로 콕 집은 것과 직접 붙여넣기는 상한 밖입니다. 0이면 상한 없음.
+            </span>
+          </label>
+          <label className="block">
+            <span className="text-[12px] font-medium text-ink-2">자동 수집 간격 (분)</span>
+            <input
+              type="number"
+              min={1}
+              max={720}
+              value={draft.syncMinutes}
+              onChange={(e) => edit((s) => ({ ...s, syncMinutes: Number(e.target.value) }))}
+              className="num mt-1 w-full rounded-md border border-line px-2.5 py-1.5 text-[13px] focus:border-accent focus:outline-none"
+            />
+            <span className="mt-1 block text-[11px] leading-snug text-ink-4">
+              화면이 열려 있을 때 메일·디스코드를 다시 보는 간격입니다. 길게 둘수록 호출이 줍니다.
+              새 대화가 없으면 AI를 부르지 않으므로, 조용한 날은 0회입니다.
+            </span>
+          </label>
+        </div>
+
+        <details className="mt-3 text-[12px] text-ink-3">
+          <summary className="cursor-pointer select-none text-ink-2">돈 안 들게 쓰는 법</summary>
+          <div className="mt-2 space-y-2 leading-relaxed">
+            <p>
+              <b className="text-ink">디스코드 봇은 원래 무료입니다.</b> 개발자 포털도, 봇도, API도 요금이
+              없습니다. 상시 서버도 필요 없습니다 — 이 대시보드가 주기적으로 읽어가는 방식이라서요.
+            </p>
+            <p>
+              돈이 드는 건 <b className="text-ink">AI 호출뿐</b>입니다. Gemini는 Flash 계열에 무료 등급이
+              있어서, <code className="rounded bg-sunk px-1 py-0.5 font-mono text-[11px]">GEMINI_API_KEY</code>만
+              넣고 <code className="rounded bg-sunk px-1 py-0.5 font-mono text-[11px]">ANTHROPIC_API_KEY</code>를
+              비워 두면 0원으로 돌릴 수 있습니다. 위 상한을 무료 등급 한도 아래로 잡아 두면 초과가 구조적으로
+              불가능합니다. (한도는 AI Studio의 Rate limit 화면에서 확인하세요)
+            </p>
+            <p className="rounded-md border border-warn-line bg-warn-soft px-3 py-2 text-warn">
+              <b>무료 등급의 대가는 데이터입니다.</b> 구글 약관상 무료 등급은 보낸 내용과 응답을 제품 개선에
+              쓸 수 있고 사람이 검토할 수도 있습니다. 유료 등급은 그러지 않습니다. 우리는 고객 메일과 사내
+              대화를 넣으므로, 이건 대표님이 알고 정해야 하는 문제입니다.
+            </p>
+            <p>
+              유료로 가더라도 3인 팀 사용량은 작습니다. 호출을 더 줄이려면 — 디스코드를{" "}
+              <b className="text-ink">&quot;자동 수집 끔 + 📌&quot;</b>로 두면 누가 반응을 붙일 때만 AI가
+              돕니다. 간격을 30분으로 늘리고, 메일 조건(위 키워드 규칙 항목)을 좁히는 것도 바로 듣습니다.
+            </p>
+          </div>
+        </details>
+      </section>
+
+      {/* ---------- 4. 디스코드 ---------- */}
       <DiscordSection
         value={draft.discord}
         onChange={(discord) => edit((s) => ({ ...s, discord }))}
         botConfigured={Boolean(integrations?.디스코드)}
       />
 
-      {/* ---------- 4. 팀 ---------- */}
+      {/* ---------- 5. 팀 ---------- */}
       <section className="card p-5">
         <div className="flex items-baseline justify-between">
           <h2 className="text-[14px] font-semibold text-ink">팀 명단</h2>
@@ -261,7 +374,7 @@ export default function SettingsView({
         </label>
       </section>
 
-      {/* ---------- 5. 키워드 규칙 ---------- */}
+      {/* ---------- 6. 키워드 규칙 ---------- */}
       <section className="card p-5">
         <div className="flex items-baseline justify-between">
           <h2 className="text-[14px] font-semibold text-ink">키워드 규칙</h2>
@@ -344,7 +457,7 @@ export default function SettingsView({
         </div>
       </section>
 
-      {/* ---------- 6. 접근·저장소 ---------- */}
+      {/* ---------- 7. 접근·저장소 ---------- */}
       <section className="card p-5">
         <h2 className="text-[14px] font-semibold text-ink">접근과 저장소</h2>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -361,7 +474,7 @@ export default function SettingsView({
         </div>
       </section>
 
-      {/* ---------- 7. 고급 ---------- */}
+      {/* ---------- 8. 고급 ---------- */}
       <section className="card p-5">
         <button
           type="button"

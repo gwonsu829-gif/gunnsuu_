@@ -9,6 +9,7 @@ import { readSlot } from "@/lib/slot";
 import { TaskPatch, getStore } from "@/lib/store";
 import { AuditAction, PRIORITIES, ROLES, STATUSES, StageAt } from "@/lib/types";
 import { UNASSIGNED } from "@/lib/team";
+import { readUsage } from "@/lib/usage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export async function GET() {
     store.getSettings(),
     googleStatus(),
   ]);
+  const usage = await readUsage();
 
   return NextResponse.json({
     tasks: tasks.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -43,6 +45,8 @@ export async function GET() {
       구글: google.connected,
       구글_계정: google.email ?? null,
       구글_설정됨: google.configured,
+      AI_오늘: usage.calls,
+      AI_상한: settings.aiDailyLimit,
     },
   });
 }

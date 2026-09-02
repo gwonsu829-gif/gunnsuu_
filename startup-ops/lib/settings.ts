@@ -42,6 +42,12 @@ export const DEFAULT_SETTINGS: Settings = {
   mailQuery: "newer_than:7d -category:promotions -category:social -in:spam -in:trash",
   labelPrefix: "업무",
   /*
+   * 하루 200번. 3인 팀이 실제로 쓰는 양(대개 하루 20~60번)의 서너 배라 평소에는 닿지 않고,
+   * 뭔가 잘못 돌아 폭주할 때만 걸린다. 무료 등급 한도 안에 머무는 것이 목적이다.
+   */
+  aiDailyLimit: 200,
+  syncMinutes: 10,
+  /*
    * 기본은 "봇이 읽을 수 있는 모든 채널".
    *
    * 앰플랩 서버는 채널이 프로젝트·고객사 단위(ai-os, 판틀110)라 거의 전부가 업무 대화다.
@@ -170,7 +176,16 @@ export function normalizeSettings(raw: unknown): Settings {
     mailQuery: cleanString(r.mailQuery, 300) || DEFAULT_SETTINGS.mailQuery,
     labelPrefix: cleanString(r.labelPrefix, 20).replace(/\//g, "") || DEFAULT_SETTINGS.labelPrefix,
     discord: normalizeDiscord(r.discord),
+    aiDailyLimit: clampInt(r.aiDailyLimit, 0, 5000, DEFAULT_SETTINGS.aiDailyLimit),
+    // 1분보다 짧게 두면 화면을 열어 둔 것만으로 호출이 폭주한다.
+    syncMinutes: clampInt(r.syncMinutes, 1, 720, DEFAULT_SETTINGS.syncMinutes),
   };
+}
+
+function clampInt(v: unknown, min: number, max: number, fallback: number): number {
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
 }
 
 /**

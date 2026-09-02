@@ -3,6 +3,7 @@ import { findDuplicateAmong } from "./dedupe";
 import { runExtraction } from "./extract";
 import { StoredTask, TaskSource, getStore } from "./store";
 import { ExtractedTask } from "./types";
+import { CallKind } from "./usage";
 
 export interface IngestInput {
   text: string;
@@ -16,6 +17,8 @@ export interface IngestInput {
    * 모델이 빈 배열을 돌려주지 않게 한다.
    */
   mustExtract?: boolean;
+  /** 사용량을 어느 칸에 셀지 (lib/usage.ts). 기본은 수집. */
+  kind?: CallKind;
 }
 
 export interface IngestResult {
@@ -66,6 +69,7 @@ export async function ingestText(input: IngestInput): Promise<IngestResult> {
   const today = todayISO();
   const outcome = await runExtraction(text, today, undefined, {
     mustExtract: input.mustExtract,
+    kind: input.kind ?? "collect",
   });
 
   /*
